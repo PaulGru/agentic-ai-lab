@@ -13,6 +13,7 @@ class LLMProvider(ABC):
         self,
         prompt: str,
         tools: list[ToolDefinition] | None = None,
+        instructions: str | None = None,
     ) -> LLMResponse:
         pass
 
@@ -21,5 +22,6 @@ class LLMProvider(ABC):
         self,
         results: list[ToolResult],
         tools: list[ToolDefinition] | None = None,
+        instructions: str | None = None,
     ) -> LLMResponse:
         pass

@@ -16,14 +16,23 @@ provider = OpenAIProvider(
 registry = ToolRegistry()
 registry.register(CalculatorTool())
 
-agent = AgentRunner(
+
+math_agent = AgentRunner(
+    name="math",
+    instructions=(
+        "You are a math specialist. "
+        "Use the calculate tool whenever an exact arithmetic "
+        "calculation is required."
+    ),
     provider=provider,
     registry=registry,
 )
 
-answer = agent.run(
-    "Utilise calculate pour évaluer __import__('os').getcwd()"
+
+answer = math_agent.run(
+    "Combien font 125 multiplié par 48 ?"
 )
+
 
 print()
 print("Assistant >", answer)

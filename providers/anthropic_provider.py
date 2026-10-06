@@ -26,6 +26,7 @@ class AnthropicProvider(LLMProvider):
         self,
         prompt: str,
         tools: list[ToolDefinition] | None = None,
+        instructions: str | None = None,
     ) -> LLMResponse:
         self._messages = [
             {
@@ -34,12 +35,18 @@ class AnthropicProvider(LLMProvider):
             }
         ]
 
-        return self._request(tools)
+        self._last_assistant_content = None
+
+        return self._request(
+            tools=tools,
+            instructions=instructions,
+        )
 
     def continue_with_tool_results(
         self,
         results: list[ToolResult],
         tools: list[ToolDefinition] | None = None,
+        instructions: str | None = None,
     ) -> LLMResponse:
         if self._last_assistant_content is None:
             raise RuntimeError(
@@ -68,17 +75,24 @@ class AnthropicProvider(LLMProvider):
             }
         )
 
-        return self._request(tools)
-
+        return self._request(
+            tools=tools,
+            instructions=instructions,
+        )
+        
     def _request(
         self,
         tools: list[ToolDefinition] | None,
+        instructions: str | None = None,
     ) -> LLMResponse:
         request = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "messages": self._messages,
         }
+
+        if instructions:
+            request["system"] = instructions
 
         if tools:
             request["tools"] = [

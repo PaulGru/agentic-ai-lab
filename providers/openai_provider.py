@@ -21,11 +21,15 @@ class OpenAIProvider(LLMProvider):
         self,
         prompt: str,
         tools: list[ToolDefinition] | None = None,
+        instructions: str | None = None,
     ) -> LLMResponse:
         request = {
             "model": self.model,
             "input": prompt,
         }
+
+        if instructions:
+            request["instructions"] = instructions
 
         if tools:
             request["tools"] = [
@@ -43,6 +47,7 @@ class OpenAIProvider(LLMProvider):
         self,
         results: list[ToolResult],
         tools: list[ToolDefinition] | None = None,
+        instructions: str | None = None,
     ) -> LLMResponse:
         if self._previous_response_id is None:
             raise RuntimeError(
@@ -67,6 +72,9 @@ class OpenAIProvider(LLMProvider):
                 self._convert_tool(tool)
                 for tool in tools
             ]
+
+        if instructions:
+            request["instructions"] = instructions
 
         response = self.client.responses.create(**request)
 

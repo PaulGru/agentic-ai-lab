@@ -5,16 +5,24 @@ from tools.registry import ToolRegistry
 class AgentRunner:
     def __init__(
         self,
+        name: str,
+        instructions: str,
         provider: LLMProvider,
         registry: ToolRegistry,
         max_iterations: int = 5,
         verbose: bool = True,
     ):
+        if not name.strip():
+            raise ValueError("Agent name cannot be empty")
+        if not instructions.strip():
+            raise ValueError("Agent instructions cannot be empty")
         if max_iterations <= 0:
             raise ValueError(
                 "max_iterations must be greater than 0"
             )
 
+        self.name = name
+        self.instructions = instructions
         self.provider = provider
         self.registry = registry
         self.max_iterations = max_iterations
@@ -29,11 +37,12 @@ class AgentRunner:
         response = self.provider.start(
             prompt=prompt,
             tools=tools,
+            instructions=self.instructions,
         )
 
         for iteration in range(1, self.max_iterations + 1):
             self._log(
-                f"[agent] iteration {iteration}"
+                f"[{self.name}] iteration {iteration}"
             )
 
             if not response.tool_calls:
@@ -48,7 +57,7 @@ class AgentRunner:
 
             for call in response.tool_calls:
                 self._log(
-                    f"[agent] tool call: "
+                    f"[{self.name}] tool call: "
                     f"{call.name}({call.arguments})"
                 )
 
@@ -71,6 +80,7 @@ class AgentRunner:
                 self.provider.continue_with_tool_results(
                     results=results,
                     tools=tools,
+                    instructions=self.instructions,
                 )
             )
 
