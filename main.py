@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 
 from agent.runner import AgentRunner
+from orchestration.router import Router
 from providers.openai_provider import OpenAIProvider
 from tools.calculator import CalculatorTool
 from tools.registry import ToolRegistry
@@ -22,6 +23,9 @@ math_registry.register(CalculatorTool())
 
 math_agent = AgentRunner(
     name="math",
+    description=(
+        "Handles arithmetic and mathematical calculations."
+    ),
     instructions=(
         "You are a math specialist. "
         "Use the calculate tool whenever an exact arithmetic "
@@ -44,6 +48,10 @@ general_registry = ToolRegistry()
 
 general_agent = AgentRunner(
     name="general",
+    description=(
+        "Handles general knowledge questions and explanations "
+        "that do not require mathematical calculations."
+    ),
     instructions=(
         "You are a helpful general assistant. "
         "Answer clearly and concisely."
@@ -54,23 +62,27 @@ general_agent = AgentRunner(
 
 
 # -------------------------
-# Manual tests
+# Router
 # -------------------------
 
-print("=== Math agent ===")
-
-answer = math_agent.run(
-    "Combien font 125 multiplié par 48 ?"
+router_provider = OpenAIProvider(
+    model="gpt-6-luna",
 )
 
-print()
-print("Assistant >", answer)
+router = Router(
+    provider=router_provider,
+    agents=[
+        math_agent,
+        general_agent,
+    ],
+)
 
 
-print()
-print("=== General agent ===")
+# -------------------------
+# Test
+# -------------------------
 
-answer = general_agent.run(
+answer = router.run(
     "Pourquoi le ciel paraît-il bleu ?"
 )
 

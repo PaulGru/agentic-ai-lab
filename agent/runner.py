@@ -6,6 +6,7 @@ class AgentRunner:
     def __init__(
         self,
         name: str,
+        description: str,
         instructions: str,
         provider: LLMProvider,
         registry: ToolRegistry,
@@ -14,6 +15,8 @@ class AgentRunner:
     ):
         if not name.strip():
             raise ValueError("Agent name cannot be empty")
+        if not description.strip():
+            raise ValueError("Agent description cannot be empty")
         if not instructions.strip():
             raise ValueError("Agent instructions cannot be empty")
         if max_iterations <= 0:
@@ -22,6 +25,7 @@ class AgentRunner:
             )
 
         self.name = name
+        self.description = description
         self.instructions = instructions
         self.provider = provider
         self.registry = registry
