@@ -1,3 +1,4 @@
+
 from typing_extensions import TypedDict, NotRequired
 
 from langgraph.graph import StateGraph, START, END
@@ -34,21 +35,42 @@ class GraphOrchestrator:
 
         builder = StateGraph(GraphState)
 
+        # Define nodes
         builder.add_node(
             "route",
             self._route_node,
         )
 
         builder.add_node(
-            "execute",
-            self._execute_node,
+            "math",
+            self._math_node,
         )
 
+        builder.add_node(
+            "general",
+            self._general_node,
+        )
+
+        # Define graph transitions
         builder.add_edge(START, "route")
-        builder.add_edge("route", "execute")
-        builder.add_edge("execute", END)
+
+        builder.add_conditional_edges(
+            "route",
+            self._select_next_node,
+            {
+                "math": "math",
+                "general": "general",
+            },
+        )
+
+        builder.add_edge("math", END)
+        builder.add_edge("general", END)
 
         self.graph = builder.compile()
+
+    # -------------------------
+    # Routing node
+    # -------------------------
 
     def _route_node(
         self,
@@ -62,18 +84,67 @@ class GraphOrchestrator:
             "selected_agent": agent.name,
         }
 
-    def _execute_node(
+    # -------------------------
+    # Conditional routing
+    # -------------------------
+
+    def _select_next_node(
+        self,
+        state: GraphState,
+    ) -> str:
+        selected_agent = state["selected_agent"]
+
+        if selected_agent not in ("math", "general"):
+            raise RuntimeError(
+                f"Unsupported graph agent: "
+                f"'{selected_agent}'"
+            )
+
+        return selected_agent
+
+    # -------------------------
+    # Agent nodes
+    # -------------------------
+
+    def _math_node(
         self,
         state: GraphState,
     ) -> dict[str, str]:
+        self._trace(
+            "graph_node_entered",
+            node="math",
+        )
+
         answer = self.orchestrator.run_selected(
             prompt=state["prompt"],
-            agent_name=state["selected_agent"],
+            agent_name="math",
         )
 
         return {
             "answer": answer,
         }
+
+    def _general_node(
+        self,
+        state: GraphState,
+    ) -> dict[str, str]:
+        self._trace(
+            "graph_node_entered",
+            node="general",
+        )
+
+        answer = self.orchestrator.run_selected(
+            prompt=state["prompt"],
+            agent_name="general",
+        )
+
+        return {
+            "answer": answer,
+        }
+
+    # -------------------------
+    # Public execution
+    # -------------------------
 
     def run(self, prompt: str) -> str:
         if not prompt.strip():

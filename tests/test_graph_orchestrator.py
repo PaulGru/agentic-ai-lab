@@ -125,6 +125,118 @@ class GraphOrchestratorTests(unittest.TestCase):
         self.assertIn("handoff_returned", event_types)
         self.assertIn("run_finished", event_types)
 
+        entered_nodes = [
+            event.data["node"]
+            for event in tracer.events
+            if event.type == "graph_node_entered"
+        ]
+
+        self.assertEqual(
+            entered_nodes,
+            ["general"],
+        )
+    
+    
+    def test_graph_routes_directly_to_math(self):
+        tracer = Tracer(print_events=False)
+
+        # Router selects Math
+        router_provider = FakeProvider([
+            LLMResponse(text="math")
+        ])
+
+        # Math agent uses the calculator
+        math_provider = FakeProvider([
+            LLMResponse(
+                tool_calls=[
+                    ToolCall(
+                        id="calculate-1",
+                        name="calculate",
+                        arguments={
+                            "expression": "125 * 48",
+                        },
+                    )
+                ]
+            ),
+            LLMResponse(text="6000"),
+        ])
+
+        # General must not be called
+        general_provider = FakeProvider([])
+
+        math_registry = ToolRegistry()
+        math_registry.register(CalculatorTool())
+
+        math_agent = AgentRunner(
+            name="math",
+            description="Math specialist",
+            instructions="Use the calculator.",
+            provider=math_provider,
+            registry=math_registry,
+            tracer=tracer,
+        )
+
+        general_agent = AgentRunner(
+            name="general",
+            description="General specialist",
+            instructions="General assistance.",
+            provider=general_provider,
+            registry=ToolRegistry(),
+            tracer=tracer,
+        )
+
+        router = Router(
+            provider=router_provider,
+            agents=[math_agent, general_agent],
+            tracer=tracer,
+        )
+
+        orchestrator = Orchestrator(
+            router=router,
+            tracer=tracer,
+        )
+
+        graph_orchestrator = GraphOrchestrator(
+            router=router,
+            orchestrator=orchestrator,
+            tracer=tracer,
+        )
+
+        answer = graph_orchestrator.run(
+            "Calculate 125 * 48"
+        )
+
+        self.assertEqual(answer, "6000")
+
+        # Routing decision made exactly once
+        self.assertEqual(
+            len(router_provider.start_calls),
+            1,
+        )
+
+        # Math executed, General skipped
+        self.assertEqual(
+            len(math_provider.start_calls),
+            1,
+        )
+
+        self.assertEqual(
+            len(general_provider.start_calls),
+            0,
+        )
+
+        # Verify the actual graph path
+        entered_nodes = [
+            event.data["node"]
+            for event in tracer.events
+            if event.type == "graph_node_entered"
+        ]
+
+        self.assertEqual(
+            entered_nodes,
+            ["math"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

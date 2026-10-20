@@ -112,11 +112,15 @@ graph_orchestrator = GraphOrchestrator(
 # Test
 # -------------------------
 
+# answer = graph_orchestrator.run(
+#     "Rédige une courte explication destinée à un débutant "
+#     "sur la différence entre coût unitaire et coût total. "
+#     "Dans ton explication, utilise l'exemple de 125 unités "
+#     "à 48 € chacune et donne le coût total exact."
+# )
+
 answer = graph_orchestrator.run(
-    "Rédige une courte explication destinée à un débutant "
-    "sur la différence entre coût unitaire et coût total. "
-    "Dans ton explication, utilise l'exemple de 125 unités "
-    "à 48 € chacune et donne le coût total exact."
+    "Calcule exactement 125 * 48."
 )
 
 print()
