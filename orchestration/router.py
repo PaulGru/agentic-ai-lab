@@ -73,10 +73,6 @@ class Router:
 
         return agent
 
-    def run(self, prompt: str) -> str:
-        agent = self.route(prompt)
-        return agent.run(prompt)
-
     def _log(self, message: str) -> None:
         if self.verbose:
             print(message)
