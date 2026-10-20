@@ -6,6 +6,7 @@ from providers.openai_provider import OpenAIProvider
 from tools.calculator import CalculatorTool
 from tools.registry import ToolRegistry
 from observability.tracer import Tracer
+from orchestration.graph_orchestrator import GraphOrchestrator
 
 
 load_dotenv()
@@ -100,12 +101,18 @@ orchestrator = Orchestrator(
     tracer=tracer,
 )
 
+graph_orchestrator = GraphOrchestrator(
+    router=router,
+    orchestrator=orchestrator,
+    tracer=tracer,
+)
+
 
 # -------------------------
 # Test
 # -------------------------
 
-answer = orchestrator.run(
+answer = graph_orchestrator.run(
     "Rédige une courte explication destinée à un débutant "
     "sur la différence entre coût unitaire et coût total. "
     "Dans ton explication, utilise l'exemple de 125 unités "

@@ -25,7 +25,7 @@ class Orchestrator:
             raise ValueError("Prompt cannot be empty")
         
         if self.tracer is not None:
-            run_id = self.tracer.start_run()
+            self.tracer.start_run()
 
             self.tracer.record(
                 "run_started",
@@ -57,7 +57,27 @@ class Orchestrator:
 
             raise
 
-        agent = self.router.route(prompt)
+        return self._execute(
+            agent=agent,
+            prompt=prompt,
+            depth=0,
+            active_agents=(),
+        )
+
+    def run_selected(
+        self,
+        prompt: str,
+        agent_name: str,
+    ) -> str:
+        if not prompt.strip():
+            raise ValueError("Prompt cannot be empty")
+
+        agent = self.router.agents.get(agent_name)
+
+        if agent is None:
+            raise RuntimeError(
+                f"Unknown agent: '{agent_name}'"
+            )
 
         return self._execute(
             agent=agent,
