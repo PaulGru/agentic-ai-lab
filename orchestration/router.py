@@ -1,5 +1,6 @@
 from agent.runner import AgentRunner
 from providers.base import LLMProvider
+from observability.tracer import Tracer
 
 
 class Router:
@@ -7,7 +8,7 @@ class Router:
         self,
         provider: LLMProvider,
         agents: list[AgentRunner],
-        verbose: bool = True,
+        tracer: Tracer | None = None,
     ):
         if not agents:
             raise ValueError(
@@ -15,7 +16,7 @@ class Router:
             )
 
         self.provider = provider
-        self.verbose = verbose
+        self.tracer = tracer
 
         self.agents = {
             agent.name: agent
@@ -67,12 +68,20 @@ class Router:
                 f"Router selected unknown agent: '{agent_name}'"
             )
 
-        self._log(
-            f"[router] route -> {agent.name}"
+        self._trace(
+            "route_selected",
+            target=agent.name,
         )
 
         return agent
 
-    def _log(self, message: str) -> None:
-        if self.verbose:
-            print(message)
+    def _trace(
+        self,
+        event_type: str,
+        **data,
+    ) -> None:
+        if self.tracer is not None:
+            self.tracer.record(
+                event_type,
+                **data,
+            )

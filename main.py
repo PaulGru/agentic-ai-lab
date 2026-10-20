@@ -5,9 +5,11 @@ from orchestration.router import Router
 from providers.openai_provider import OpenAIProvider
 from tools.calculator import CalculatorTool
 from tools.registry import ToolRegistry
+from observability.tracer import Tracer
 
 
 load_dotenv()
+tracer = Tracer()
 
 
 # -------------------------
@@ -34,6 +36,7 @@ math_agent = AgentRunner(
     ),
     provider=math_provider,
     registry=math_registry,
+    tracer=tracer,
 )
 
 
@@ -64,6 +67,7 @@ general_agent = AgentRunner(
     ),
     provider=general_provider,
     registry=general_registry,
+    tracer=tracer,
     handoff_targets={
         "math": (
             "Specialist for exact arithmetic "
@@ -88,10 +92,12 @@ router = Router(
         math_agent,
         general_agent,
     ],
+    tracer=tracer,
 )
 
 orchestrator = Orchestrator(
     router=router,
+    tracer=tracer,
 )
 
 
@@ -100,8 +106,10 @@ orchestrator = Orchestrator(
 # -------------------------
 
 answer = orchestrator.run(
-    "Explique brièvement ce qu'est un coût total, "
-    "puis donne le coût exact de 125 unités à 48 € chacune."
+    "Rédige une courte explication destinée à un débutant "
+    "sur la différence entre coût unitaire et coût total. "
+    "Dans ton explication, utilise l'exemple de 125 unités "
+    "à 48 € chacune et donne le coût total exact."
 )
 
 print()

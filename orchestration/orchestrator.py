@@ -1,6 +1,7 @@
 from agent.models import AgentOutcome
 from agent.runner import AgentRunner
 from orchestration.router import Router
+from observability.tracer import Tracer
 
 
 class Orchestrator:
@@ -8,7 +9,7 @@ class Orchestrator:
         self,
         router: Router,
         max_handoff_depth: int = 3,
-        verbose: bool = True,
+        tracer: Tracer | None = None,
     ):
         if max_handoff_depth <= 0:
             raise ValueError(
@@ -17,11 +18,44 @@ class Orchestrator:
 
         self.router = router
         self.max_handoff_depth = max_handoff_depth
-        self.verbose = verbose
+        self.tracer = tracer
 
     def run(self, prompt: str) -> str:
         if not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+        
+        if self.tracer is not None:
+            run_id = self.tracer.start_run()
+
+            self.tracer.record(
+                "run_started",
+                prompt=prompt,
+            )
+
+        try:
+            agent = self.router.route(prompt)
+
+            answer = self._execute(
+                agent=agent,
+                prompt=prompt,
+                depth=0,
+                active_agents=(),
+            )
+
+            self._trace(
+                "run_finished",
+            )
+
+            return answer
+
+        except Exception as error:
+            self._trace(
+                "run_failed",
+                error_type=type(error).__name__,
+                error=str(error),
+            )
+
+            raise
 
         agent = self.router.route(prompt)
 
@@ -84,9 +118,11 @@ class Orchestrator:
                     f"'{request.target_agent}'"
                 )
 
-            self._log(
-                f"[orchestrator] handoff "
-                f"{agent.name} -> {target_agent.name}"
+            self._trace(
+                "handoff_started",
+                source=agent.name,
+                target=target_agent.name,
+                depth=depth + 1,
             )
 
             delegated_result = self._execute(
@@ -96,9 +132,11 @@ class Orchestrator:
                 active_agents=active_agents,
             )
 
-            self._log(
-                f"[orchestrator] return "
-                f"{target_agent.name} -> {agent.name}"
+            self._trace(
+                "handoff_returned",
+                source=target_agent.name,
+                target=agent.name,
+                depth=depth + 1,
             )
 
             outcome = agent.resume_handoff(
@@ -113,6 +151,13 @@ class Orchestrator:
 
         return outcome.text
 
-    def _log(self, message: str) -> None:
-        if self.verbose:
-            print(message)
+    def _trace(
+        self,
+        event_type: str,
+        **data,
+    ) -> None:
+        if self.tracer is not None:
+            self.tracer.record(
+                event_type,
+                **data,
+            )

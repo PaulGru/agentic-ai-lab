@@ -7,6 +7,7 @@ from agent.models import (
 )
 from providers.base import LLMProvider
 from tools.registry import ToolRegistry
+from observability.tracer import Tracer
 
 
 HANDOFF_TOOL_NAME = "handoff_to_agent"
@@ -22,7 +23,7 @@ class AgentRunner:
         registry: ToolRegistry,
         handoff_targets: dict[str, str] | None = None,
         max_iterations: int = 5,
-        verbose: bool = True,
+        tracer: Tracer | None = None,
     ):
         if not name.strip():
             raise ValueError("Agent name cannot be empty")
@@ -45,7 +46,7 @@ class AgentRunner:
         self.registry = registry
         self.handoff_targets = dict(handoff_targets or {})
         self.max_iterations = max_iterations
-        self.verbose = verbose
+        self.tracer = tracer
 
     def run(self, prompt: str) -> AgentOutcome:
         if not prompt.strip():
@@ -104,12 +105,19 @@ class AgentRunner:
             1,
             self.max_iterations + 1,
         ):
-            self._log(
-                f"[{self.name}] iteration {iteration}"
+            self._trace(
+                "agent_iteration",
+                agent=self.name,
+                iteration=iteration,
             )
 
             if not response.tool_calls:
                 if response.text:
+                    self._trace(
+                        "agent_final",
+                        agent=self.name,
+                    )
+
                     return AgentOutcome(
                         text=response.text
                     )
@@ -153,9 +161,10 @@ class AgentRunner:
                         "Handoff task cannot be empty"
                     )
 
-                self._log(
-                    f"[{self.name}] handoff request -> "
-                    f"{target_agent}"
+                self._trace(
+                    "handoff_requested",
+                    source=self.name,
+                    target=target_agent,
                 )
 
                 return AgentOutcome(
@@ -169,23 +178,22 @@ class AgentRunner:
             results = []
 
             for call in response.tool_calls:
-                self._log(
-                    f"[{self.name}] tool call: "
-                    f"{call.name}({call.arguments})"
+                self._trace(
+                    "tool_call",
+                    agent=self.name,
+                    tool=call.name,
+                    arguments=call.arguments,
                 )
 
                 result = self.registry.execute(call)
 
-                if result.is_error:
-                    self._log(
-                        f"[tool:error] "
-                        f"{call.name} -> {result.output}"
-                    )
-                else:
-                    self._log(
-                        f"[tool] "
-                        f"{call.name} -> {result.output}"
-                    )
+                self._trace(
+                    "tool_result",
+                    agent=self.name,
+                    tool=call.name,
+                    output=result.output,
+                    is_error=result.is_error,
+                )
 
                 results.append(result)
 
@@ -258,6 +266,13 @@ class AgentRunner:
             handoff_tool,
         ]
 
-    def _log(self, message: str) -> None:
-        if self.verbose:
-            print(message)
+    def _trace(
+        self,
+        event_type: str,
+        **data,
+    ) -> None:
+        if self.tracer is not None:
+            self.tracer.record(
+                event_type,
+                **data,
+            )
