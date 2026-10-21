@@ -1,0 +1,15 @@
+# LLM Providers
+openai==3.24.0
+anthropic
+
+# Environment variables
+python-dotenv==1.2.4
+
+# Agent orchestration
+langgraph==1.2.16
+
+# Checkpoint persistence
+langgraph-checkpoint-sqlite==3.1.2
+
+# Type annotations
+typing_extensions==4.16.0

@@ -7,8 +7,6 @@ from tools.calculator import CalculatorTool
 from tools.registry import ToolRegistry
 from observability.tracer import Tracer
 from orchestration.graph_orchestrator import GraphOrchestrator
-from orchestration.orchestrator import Orchestrator
-
 from uuid import uuid4
 
 from langgraph.checkpoint.sqlite import SqliteSaver

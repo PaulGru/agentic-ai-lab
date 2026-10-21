@@ -391,7 +391,238 @@ class GraphOrchestratorTests(unittest.TestCase):
         self.assertTrue(
             final_snapshot.values["finished"]
         )
+    
+    
+    def test_graph_keeps_threads_isolated(self):
+        router_provider = FakeProvider([
+            LLMResponse(text="math"),
+            LLMResponse(text="general"),
+        ])
 
+        math_provider = FakeProvider([
+            LLMResponse(text="6000"),
+        ])
+
+        general_provider = FakeProvider([
+            LLMResponse(text="Bonjour !"),
+        ])
+
+        math_agent = AgentRunner(
+            name="math",
+            description="Math specialist",
+            instructions="Calculate.",
+            provider=math_provider,
+            registry=ToolRegistry(),
+        )
+
+        general_agent = AgentRunner(
+            name="general",
+            description="General specialist",
+            instructions="Answer questions.",
+            provider=general_provider,
+            registry=ToolRegistry(),
+        )
+
+        router = Router(
+            provider=router_provider,
+            agents=[math_agent, general_agent],
+        )
+
+        orchestrator = GraphOrchestrator(
+            router=router,
+        )
+
+        math_answer = orchestrator.run(
+            "Calculate 125 * 48",
+            thread_id="thread-math",
+        )
+
+        general_answer = orchestrator.run(
+            "Say hello",
+            thread_id="thread-general",
+        )
+
+        self.assertEqual(math_answer, "6000")
+        self.assertEqual(
+            general_answer,
+            "Bonjour !",
+        )
+
+        math_state = orchestrator.graph.get_state({
+            "configurable": {
+                "thread_id": "thread-math",
+            }
+        })
+
+        general_state = orchestrator.graph.get_state({
+            "configurable": {
+                "thread_id": "thread-general",
+            }
+        })
+
+        self.assertEqual(
+            math_state.values["selected_agent"],
+            "math",
+        )
+
+        self.assertEqual(
+            general_state.values["selected_agent"],
+            "general",
+        )
+
+        self.assertEqual(
+            math_state.values["answer"],
+            "6000",
+        )
+
+        self.assertEqual(
+            general_state.values["answer"],
+            "Bonjour !",
+        )
+
+        self.assertEqual(math_state.next, ())
+        self.assertEqual(general_state.next, ())
+
+    
+    def test_checkpoint_preserves_pending_handoff(self):
+        general_provider = FakeProvider([
+            LLMResponse(
+                tool_calls=[
+                    ToolCall(
+                        id="handoff-1",
+                        name="handoff_to_agent",
+                        arguments={
+                            "agent": "math",
+                            "task": "Calculate 125 * 48",
+                        },
+                    )
+                ]
+            ),
+            LLMResponse(
+                text="Le coût total est de 6000 €."
+            ),
+        ])
+
+        math_provider = FakeProvider([
+            LLMResponse(text="6000"),
+        ])
+
+        math_agent = AgentRunner(
+            name="math",
+            description="Math specialist",
+            instructions="Calculate.",
+            provider=math_provider,
+            registry=ToolRegistry(),
+        )
+
+        general_agent = AgentRunner(
+            name="general",
+            description="General specialist",
+            instructions="Delegate calculations.",
+            provider=general_provider,
+            registry=ToolRegistry(),
+            handoff_targets={
+                "math": "Math specialist",
+            },
+        )
+
+        router_provider = FakeProvider([
+            LLMResponse(text="general"),
+        ])
+
+        router = Router(
+            provider=router_provider,
+            agents=[math_agent, general_agent],
+        )
+
+        orchestrator = GraphOrchestrator(
+            router=router,
+        )
+
+        config = {
+            "configurable": {
+                "thread_id": "pending-handoff",
+            },
+        }
+
+        # Execute General and pause before Math.
+        orchestrator.graph.invoke(
+            {"prompt": "Explain the total cost."},
+            config=config,
+            interrupt_before=["math"],
+        )
+
+        snapshot = orchestrator.graph.get_state(
+            config
+        )
+
+        self.assertEqual(snapshot.next, ("math",))
+        self.assertEqual(
+            snapshot.values["current_agent"],
+            "math",
+        )
+
+        stack = snapshot.values["handoff_stack"]
+
+        self.assertEqual(len(stack), 1)
+        self.assertEqual(
+            stack[0]["source_agent"],
+            "general",
+        )
+        self.assertEqual(
+            stack[0]["target_agent"],
+            "math",
+        )
+        self.assertEqual(
+            stack[0]["call_id"],
+            "handoff-1",
+        )
+
+        self.assertEqual(
+            len(math_provider.start_calls),
+            0,
+        )
+
+        # Resume in the same process.
+        final_state = orchestrator.graph.invoke(
+            None,
+            config=config,
+        )
+
+        self.assertEqual(
+            final_state["answer"],
+            "Le coût total est de 6000 €.",
+        )
+
+        self.assertEqual(
+            final_state["handoff_stack"],
+            [],
+        )
+
+        self.assertEqual(
+            len(general_provider.continue_calls),
+            1,
+        )
+
+        returned_result = (
+            general_provider.continue_calls[0]
+            ["results"][0]
+        )
+
+        self.assertEqual(
+            returned_result.output,
+            "6000",
+        )
+
+        self.assertEqual(
+            len(router_provider.start_calls),
+            1,
+        )
+
+        self.assertEqual(
+            orchestrator.graph.get_state(config).next,
+            (),
+        )
 
 
 if __name__ == "__main__":
