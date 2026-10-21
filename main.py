@@ -9,6 +9,10 @@ from observability.tracer import Tracer
 from orchestration.graph_orchestrator import GraphOrchestrator
 from orchestration.orchestrator import Orchestrator
 
+from uuid import uuid4
+
+from langgraph.checkpoint.sqlite import SqliteSaver
+
 
 load_dotenv()
 tracer = Tracer()
@@ -97,23 +101,58 @@ router = Router(
     tracer=tracer,
 )
 
-graph_orchestrator = GraphOrchestrator(
-    router=router,
-    tracer=tracer,
-    max_handoff_depth=3,
-)
-
 
 # -------------------------
-# Test
+# Persistent execution
 # -------------------------
 
-answer = graph_orchestrator.run(
-    "Rédige une courte explication destinée à un débutant "
-    "sur la différence entre coût unitaire et coût total. "
-    "Dans ton explication, utilise l'exemple de 125 unités "
-    "à 48 € chacune et donne le coût total exact."
-)
+with SqliteSaver.from_conn_string(
+    "checkpoints.sqlite"
+) as checkpointer:
 
-print()
-print("Assistant >", answer)
+    graph_orchestrator = GraphOrchestrator(
+        router=router,
+        tracer=tracer,
+        max_handoff_depth=3,
+        checkpointer=checkpointer,
+    )
+
+    thread_id = str(uuid4())
+
+    answer = graph_orchestrator.run(
+        "Rédige une courte explication destinée à un débutant "
+        "sur la différence entre coût unitaire et coût total. "
+        "Dans ton explication, utilise l'exemple de 125 unités "
+        "à 48 € chacune et donne le coût total exact.",
+        thread_id=thread_id,
+    )
+
+    print()
+    print("Assistant >", answer)
+
+    # -------------------------
+    # Inspect checkpoint
+    # -------------------------
+
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+        }
+    }
+
+    snapshot = graph_orchestrator.graph.get_state(
+        config
+    )
+
+    print()
+    print("Thread ID >", thread_id)
+    print("Finished >", snapshot.values["finished"])
+    print("Next nodes >", snapshot.next)
+
+    history = list(
+        graph_orchestrator.graph.get_state_history(
+            config
+        )
+    )
+
+    print("Checkpoints >", len(history))

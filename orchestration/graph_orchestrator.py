@@ -7,6 +7,11 @@ from agent.models import HandoffRequest
 from orchestration.router import Router
 from observability.tracer import Tracer
 
+from uuid import uuid4
+
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import InMemorySaver
+
 
 # -------------------------
 # Handoff information
@@ -47,6 +52,7 @@ class GraphOrchestrator:
         router: Router,
         tracer: Tracer | None = None,
         max_handoff_depth: int = 3,
+        checkpointer: BaseCheckpointSaver | None = None,
     ):
         if max_handoff_depth <= 0:
             raise ValueError(
@@ -56,6 +62,11 @@ class GraphOrchestrator:
         self.router = router
         self.tracer = tracer
         self.max_handoff_depth = max_handoff_depth
+        self.checkpointer = (
+            checkpointer
+            if checkpointer is not None
+            else InMemorySaver()
+        )
 
         builder = StateGraph(GraphState)
 
@@ -95,7 +106,9 @@ class GraphOrchestrator:
             paths,
         )
 
-        self.graph = builder.compile()
+        self.graph = builder.compile(
+            checkpointer=self.checkpointer,
+        )
 
     # -------------------------
     # Initial routing
@@ -321,21 +334,39 @@ class GraphOrchestrator:
     # Public execution
     # -------------------------
 
-    def run(self, prompt: str) -> str:
+    def run(
+        self,
+        prompt: str,
+        thread_id: str | None = None,
+    ) -> str:
         if not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        if thread_id is None:
+            thread_id = str(uuid4())
+
+        if not thread_id.strip():
+            raise ValueError("Thread ID cannot be empty")
+
+        config = {
+            "configurable": {
+                "thread_id": thread_id,
+            },
+            "recursion_limit": 30,
+        }
 
         if self.tracer is not None:
             self.tracer.start_run()
             self.tracer.record(
                 "run_started",
                 prompt=prompt,
+                thread_id=thread_id,
             )
 
         try:
             final_state = self.graph.invoke(
                 {"prompt": prompt},
-                config={"recursion_limit": 30},
+                config=config,
             )
 
             self._trace("run_finished")

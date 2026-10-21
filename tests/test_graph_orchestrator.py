@@ -308,6 +308,90 @@ class GraphOrchestratorTests(unittest.TestCase):
         ]
 
         self.assertIn("run_failed", event_types)
+    
+    
+    def test_graph_checkpoint_and_resume(self):
+        router_provider = FakeProvider([
+            LLMResponse(text="math")
+        ])
+
+        math_provider = FakeProvider([
+            LLMResponse(text="6000")
+        ])
+
+        math_agent = AgentRunner(
+            name="math",
+            description="Math agent",
+            instructions="Calculate.",
+            provider=math_provider,
+            registry=ToolRegistry(),
+        )
+
+        general_agent = AgentRunner(
+            name="general",
+            description="General agent",
+            instructions="Answer.",
+            provider=FakeProvider([]),
+            registry=ToolRegistry(),
+        )
+
+        router = Router(
+            provider=router_provider,
+            agents=[math_agent, general_agent],
+        )
+
+        graph_orchestrator = GraphOrchestrator(
+            router=router,
+        )
+
+        config = {
+            "configurable": {
+                "thread_id": "test-checkpoint",
+            }
+        }
+
+        # Stop before the Math node
+        graph_orchestrator.graph.invoke(
+            {"prompt": "Calculate 125 * 48"},
+            config=config,
+            interrupt_before=["math"],
+        )
+
+        snapshot = graph_orchestrator.graph.get_state(
+            config
+        )
+
+        self.assertEqual(snapshot.next, ("math",))
+        self.assertEqual(
+            len(math_provider.start_calls),
+            0,
+        )
+
+        # Resume the saved execution
+        result = graph_orchestrator.graph.invoke(
+            None,
+            config=config,
+        )
+
+        self.assertEqual(result["answer"], "6000")
+        self.assertEqual(
+            len(router_provider.start_calls),
+            1,
+        )
+        self.assertEqual(
+            len(math_provider.start_calls),
+            1,
+        )
+
+        final_snapshot = (
+            graph_orchestrator.graph.get_state(config)
+        )
+
+        self.assertEqual(final_snapshot.next, ())
+        self.assertTrue(
+            final_snapshot.values["finished"]
+        )
+
 
 
 if __name__ == "__main__":

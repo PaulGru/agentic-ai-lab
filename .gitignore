@@ -4,3 +4,9 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# LangGraph checkpoints
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
