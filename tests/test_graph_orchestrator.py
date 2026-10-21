@@ -85,14 +85,8 @@ class GraphOrchestratorTests(unittest.TestCase):
             tracer=tracer,
         )
 
-        orchestrator = Orchestrator(
-            router=router,
-            tracer=tracer,
-        )
-
         graph_orchestrator = GraphOrchestrator(
             router=router,
-            orchestrator=orchestrator,
             tracer=tracer,
         )
 
@@ -133,7 +127,7 @@ class GraphOrchestratorTests(unittest.TestCase):
 
         self.assertEqual(
             entered_nodes,
-            ["general"],
+            ["general", "math", "general"],
         )
     
     
@@ -191,14 +185,8 @@ class GraphOrchestratorTests(unittest.TestCase):
             tracer=tracer,
         )
 
-        orchestrator = Orchestrator(
-            router=router,
-            tracer=tracer,
-        )
-
         graph_orchestrator = GraphOrchestrator(
             router=router,
-            orchestrator=orchestrator,
             tracer=tracer,
         )
 
@@ -236,6 +224,90 @@ class GraphOrchestratorTests(unittest.TestCase):
             entered_nodes,
             ["math"],
         )
+    
+    
+    def test_graph_rejects_handoff_cycle(self):
+        tracer = Tracer(print_events=False)
+
+        general_provider = FakeProvider([
+            LLMResponse(
+                tool_calls=[
+                    ToolCall(
+                        id="general-to-math",
+                        name="handoff_to_agent",
+                        arguments={
+                            "agent": "math",
+                            "task": "Ask Math",
+                        },
+                    )
+                ]
+            )
+        ])
+
+        math_provider = FakeProvider([
+            LLMResponse(
+                tool_calls=[
+                    ToolCall(
+                        id="math-to-general",
+                        name="handoff_to_agent",
+                        arguments={
+                            "agent": "general",
+                            "task": "Ask General",
+                        },
+                    )
+                ]
+            )
+        ])
+
+        general_agent = AgentRunner(
+            name="general",
+            description="General agent",
+            instructions="Delegate to Math.",
+            provider=general_provider,
+            registry=ToolRegistry(),
+            handoff_targets={
+                "math": "Math specialist",
+            },
+            tracer=tracer,
+        )
+
+        math_agent = AgentRunner(
+            name="math",
+            description="Math agent",
+            instructions="Delegate to General.",
+            provider=math_provider,
+            registry=ToolRegistry(),
+            handoff_targets={
+                "general": "General specialist",
+            },
+            tracer=tracer,
+        )
+
+        router = Router(
+            provider=FakeProvider([
+                LLMResponse(text="general")
+            ]),
+            agents=[general_agent, math_agent],
+            tracer=tracer,
+        )
+
+        graph_orchestrator = GraphOrchestrator(
+            router=router,
+            tracer=tracer,
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Handoff cycle detected",
+        ):
+            graph_orchestrator.run("Start")
+
+        event_types = [
+            event.type
+            for event in tracer.events
+        ]
+
+        self.assertIn("run_failed", event_types)
 
 
 if __name__ == "__main__":

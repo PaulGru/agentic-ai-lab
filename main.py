@@ -7,6 +7,7 @@ from tools.calculator import CalculatorTool
 from tools.registry import ToolRegistry
 from observability.tracer import Tracer
 from orchestration.graph_orchestrator import GraphOrchestrator
+from orchestration.orchestrator import Orchestrator
 
 
 load_dotenv()
@@ -96,15 +97,10 @@ router = Router(
     tracer=tracer,
 )
 
-orchestrator = Orchestrator(
-    router=router,
-    tracer=tracer,
-)
-
 graph_orchestrator = GraphOrchestrator(
     router=router,
-    orchestrator=orchestrator,
     tracer=tracer,
+    max_handoff_depth=3,
 )
 
 
@@ -112,15 +108,11 @@ graph_orchestrator = GraphOrchestrator(
 # Test
 # -------------------------
 
-# answer = graph_orchestrator.run(
-#     "Rédige une courte explication destinée à un débutant "
-#     "sur la différence entre coût unitaire et coût total. "
-#     "Dans ton explication, utilise l'exemple de 125 unités "
-#     "à 48 € chacune et donne le coût total exact."
-# )
-
 answer = graph_orchestrator.run(
-    "Calcule exactement 125 * 48."
+    "Rédige une courte explication destinée à un débutant "
+    "sur la différence entre coût unitaire et coût total. "
+    "Dans ton explication, utilise l'exemple de 125 unités "
+    "à 48 € chacune et donne le coût total exact."
 )
 
 print()
