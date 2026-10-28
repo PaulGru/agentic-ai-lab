@@ -12,6 +12,8 @@ from uuid import uuid4
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 
+from langgraph.types import interrupt
+
 
 # -------------------------
 # Handoff information
@@ -40,6 +42,9 @@ class GraphState(TypedDict):
 
     answer: NotRequired[str]
     finished: NotRequired[bool]
+
+    require_review: NotRequired[bool]
+    review_approved: NotRequired[bool | None]
 
 
 # -------------------------
@@ -74,9 +79,11 @@ class GraphOrchestrator:
         builder.add_node("route", self._route_node)
         builder.add_node("math", self._math_node)
         builder.add_node("general", self._general_node)
+        builder.add_node("human_review", self._human_review_node)
 
         # Initial routing
         builder.add_edge(START, "route")
+        builder.add_edge("human_review", END)
 
         builder.add_conditional_edges(
             "route",
@@ -91,6 +98,7 @@ class GraphOrchestrator:
         paths = {
             "math": "math",
             "general": "general",
+            "human_review": "human_review",
             "end": END,
         }
 
@@ -140,6 +148,8 @@ class GraphOrchestrator:
         state: GraphState,
     ) -> str:
         if state.get("finished", False):
+            if state.get("require_review", False):
+                return "human_review"
             return "end"
 
         agent_name = state["current_agent"]
@@ -391,3 +401,32 @@ class GraphOrchestrator:
                 event_type,
                 **data,
             )
+
+    def _human_review_node(
+        self,
+        state: GraphState,
+    ) -> dict:
+        decision = interrupt({
+            "type": "answer_review",
+            "question": "Approuver cette réponse ?",
+            "draft": state["answer"],
+        })
+
+        if type(decision) is not bool:
+            raise ValueError(
+                "Review decision must be a boolean"
+            )
+
+        self._trace(
+            "human_review_completed",
+            approved=decision,
+        )
+
+        return {
+            "review_approved": decision,
+            "answer": (
+                state["answer"]
+                if decision
+                else "Réponse refusée par le validateur humain."
+            ),
+        }
