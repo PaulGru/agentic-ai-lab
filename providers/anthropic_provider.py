@@ -1,5 +1,7 @@
 from anthropic import Anthropic
 
+import copy
+
 from agent.models import (
     LLMResponse,
     ToolCall,
@@ -135,3 +137,21 @@ class AnthropicProvider(LLMProvider):
             "description": tool.description,
             "input_schema": tool.input_schema,
         }
+   
+    def export_state(self) -> dict:
+        return {
+            "messages": copy.deepcopy(
+                self._messages
+            ),
+            "last_assistant_content": copy.deepcopy(
+                self._last_assistant_content
+            ),
+        }
+
+    def restore_state(self, state: dict) -> None:
+        self._messages = copy.deepcopy(
+            state["messages"]
+        )
+        self._last_assistant_content = copy.deepcopy(
+            state["last_assistant_content"]
+        )

@@ -276,3 +276,35 @@ class AgentRunner:
                 event_type,
                 **data,
             )
+    
+    def propose(self, prompt: str) -> LLMResponse:
+        """
+        Ask the LLM for its next response,
+        without executing any tool.
+        """
+        if not prompt.strip():
+            raise ValueError("Prompt cannot be empty")
+
+        return self.provider.start(
+            prompt=prompt,
+            tools=self._tool_definitions(),
+            instructions=self.instructions,
+        )
+
+
+    def continue_after_tools(
+        self,
+        results: list[ToolResult],
+    ) -> LLMResponse:
+        """
+        Send tool results back to the LLM.
+        No tool is executed here.
+        """
+        if not results:
+            raise ValueError("Tool results cannot be empty")
+
+        return self.provider.continue_with_tool_results(
+            results=results,
+            tools=self._tool_definitions(),
+            instructions=self.instructions,
+        )

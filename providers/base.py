@@ -25,3 +25,13 @@ class LLMProvider(ABC):
         instructions: str | None = None,
     ) -> LLMResponse:
         pass
+    
+    def export_state(self) -> dict:
+        raise NotImplementedError(
+            "Provider state export is not supported"
+        )
+
+    def restore_state(self, state: dict) -> None:
+        raise NotImplementedError(
+            "Provider state restoration is not supported"
+        )

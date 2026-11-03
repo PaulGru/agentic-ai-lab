@@ -108,3 +108,15 @@ class OpenAIProvider(LLMProvider):
             "description": tool.description,
             "parameters": tool.input_schema,
         }
+    
+    def export_state(self) -> dict:
+        return {
+            "previous_response_id": (
+                self._previous_response_id
+            ),
+        }
+
+    def restore_state(self, state: dict) -> None:
+        self._previous_response_id = (
+            state["previous_response_id"]
+        )
