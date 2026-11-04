@@ -13,3 +13,7 @@ langgraph-checkpoint-sqlite==3.1.2
 
 # Type annotations
 typing_extensions==4.16.0
+
+# HTTP API - V5.2
+fastapi
+uvicorn

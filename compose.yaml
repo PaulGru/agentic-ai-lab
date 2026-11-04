@@ -1,0 +1,24 @@
+services:
+  lab:
+    build: .
+    volumes:
+      - agentic_state:/app/data
+  
+  api:
+    build: .
+    entrypoint:
+      - python
+      - -m
+      - uvicorn
+      - api_v52:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - agentic_state:/app/data
+
+volumes:
+  agentic_state:
