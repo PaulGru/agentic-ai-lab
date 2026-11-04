@@ -10,7 +10,7 @@ services:
       - python
       - -m
       - uvicorn
-      - api_v53:app
+      - api_v54:app
       - --host
       - 0.0.0.0
       - --port
@@ -20,11 +20,22 @@ services:
     environment:
       DATABASE_URL: "postgresql://lab:${POSTGRES_PASSWORD:?Missing POSTGRES_PASSWORD}@db:5432/agentic_lab"
       LANGGRAPH_STRICT_MSGPACK: "true"
+      AGENTIC_API_KEY: "${AGENTIC_API_KEY:?Missing AGENTIC_API_KEY}"
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - agentic_state:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   db:
     image: postgres:17-alpine
