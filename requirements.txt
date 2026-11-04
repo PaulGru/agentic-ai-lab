@@ -17,3 +17,7 @@ typing_extensions==4.16.0
 # HTTP API - V5.2
 fastapi
 uvicorn
+
+# PostgreSQL checkpoint persistence - V5.3
+langgraph-checkpoint-postgres==3.2.0
+psycopg[binary]>=3.2,<4

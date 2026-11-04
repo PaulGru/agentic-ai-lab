@@ -1,0 +1,14 @@
+.git/
+.venv/
+.env
+.env.*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+*.sqlite
+*.sqlite-*
+v*_notes/
+data/
+
+*.zip

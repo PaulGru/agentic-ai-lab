@@ -10,15 +10,38 @@ services:
       - python
       - -m
       - uvicorn
-      - api_v52:app
+      - api_v53:app
       - --host
       - 0.0.0.0
       - --port
       - "8000"
     ports:
       - "127.0.0.1:8000:8000"
+    environment:
+      DATABASE_URL: "postgresql://lab:${POSTGRES_PASSWORD:?Missing POSTGRES_PASSWORD}@db:5432/agentic_lab"
+      LANGGRAPH_STRICT_MSGPACK: "true"
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - agentic_state:/app/data
 
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Missing POSTGRES_PASSWORD}
+      POSTGRES_DB: agentic_lab
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lab -d agentic_lab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+
 volumes:
   agentic_state:
+  postgres_data:
