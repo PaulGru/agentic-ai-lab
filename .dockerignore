@@ -12,3 +12,6 @@ v*_notes/
 data/
 
 *.zip
+
+certs/
+compose.override.yaml
