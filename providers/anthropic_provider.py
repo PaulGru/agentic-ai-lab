@@ -16,10 +16,12 @@ class AnthropicProvider(LLMProvider):
         self,
         model: str,
         max_tokens: int = 1024,
+        native_web_search: bool = False,
     ):
         self.client = Anthropic()
         self.model = model
         self.max_tokens = max_tokens
+        self.native_web_search = native_web_search
 
         self._messages = []
         self._last_assistant_content = None
@@ -82,6 +84,7 @@ class AnthropicProvider(LLMProvider):
             instructions=instructions,
         )
         
+    
     def _request(
         self,
         tools: list[ToolDefinition] | None,
@@ -96,11 +99,20 @@ class AnthropicProvider(LLMProvider):
         if instructions:
             request["system"] = instructions
 
-        if tools:
-            request["tools"] = [
-                self._convert_tool(tool)
-                for tool in tools
-            ]
+        request_tools = [
+            self._convert_tool(tool)
+            for tool in (tools or [])
+        ]
+
+        if self.native_web_search:
+            request_tools.append({
+                "type": "web_search_20250305",
+                "name": "web_search",
+                "max_uses": 2,
+            })
+
+        if request_tools:
+            request["tools"] = request_tools
 
         response = self.client.messages.create(**request)
 
@@ -111,10 +123,41 @@ class AnthropicProvider(LLMProvider):
 
         text_parts = []
         tool_calls = []
+        sources = []
+        seen_urls = set()
+        web_search_used = False
 
         for block in response.content:
-            if block.type == "text":
+            if block.type == "server_tool_use":
+                if block.name == "web_search":
+                    web_search_used = True
+
+            elif block.type == "web_search_tool_result":
+                web_search_used = True
+
+            elif block.type == "text":
                 text_parts.append(block.text)
+
+                citations = (
+                    getattr(block, "citations", None) or []
+                )
+
+                for citation in citations:
+                    if citation.type != "web_search_result_location":
+                        continue
+
+                    url = citation.url
+
+                    if (
+                        isinstance(url, str)
+                        and url.startswith(("https://", "http://"))
+                        and url not in seen_urls
+                    ):
+                        sources.append({
+                            "title": citation.title or url,
+                            "url": url,
+                        })
+                        seen_urls.add(url)
 
             elif block.type == "tool_use":
                 tool_calls.append(
@@ -128,6 +171,8 @@ class AnthropicProvider(LLMProvider):
         return LLMResponse(
             text="\n".join(text_parts) or None,
             tool_calls=tool_calls,
+            web_search_used=web_search_used,
+            sources=sources,
         )
 
     @staticmethod

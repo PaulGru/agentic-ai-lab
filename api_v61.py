@@ -11,7 +11,7 @@ from api_v54 import (
 from research.factory import build_research_graph
 
 
-app.version = "6.1"
+app.version = "6.2"
 
 
 class ResearchRequest(BaseModel):
@@ -39,6 +39,7 @@ def research_config(thread_id: str) -> dict:
     return make_config(f"v6-research:{thread_id}")
 
 
+
 def describe_research(graph, config, thread_id):
     snapshot = graph.get_state(config)
 
@@ -48,14 +49,21 @@ def describe_research(graph, config, thread_id):
             detail="Research workflow not found",
         )
 
+    values = snapshot.values
+
     return {
         "thread_id": thread_id,
         "status": (
             "completed" if not snapshot.next
             else "in_progress"
         ),
-        "answer": snapshot.values.get("answer") or None,
+        "answer": values.get("answer") or None,
+        "web_search_used": values.get(
+            "web_search_used", False
+        ),
+        "sources": values.get("sources", []),
     }
+
 
 
 @app.post("/research", status_code=201)

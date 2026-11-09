@@ -14,6 +14,8 @@ class StatefulFakeProvider(FakeProvider):
             LLMResponse(
                 text=item["text"],
                 tool_calls=[ToolCall(**call) for call in item["tool_calls"]],
+                web_search_used=item.get("web_search_used", False),
+                sources=item.get("sources", []),
             )
             for item in state["remaining"]
         ]

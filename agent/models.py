@@ -29,6 +29,9 @@ class LLMResponse:
     text: str | None = None
     tool_calls: list[ToolCall] = field(default_factory=list)
 
+    web_search_used: bool = False
+    sources: list[dict[str, str]] = field(default_factory=list)
+
 
 @dataclass(frozen=True)
 class HandoffRequest:

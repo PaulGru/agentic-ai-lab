@@ -44,6 +44,8 @@ class AgentToolState(TypedDict):
     approval_status: NotRequired[str]
     llm_steps: NotRequired[int]
     answer: NotRequired[str]
+    sources: NotRequired[list[dict[str, str]]]
+    web_search_used: NotRequired[bool]
 
 
 class AgentToolGraph:
@@ -115,6 +117,8 @@ class AgentToolGraph:
             "tool_results": [],
             "llm_steps": 0,
             "answer": "",
+            "sources": [],
+            "web_search_used": False,
         }
 
     def _selected_agent(self, state: AgentToolState) -> AgentRunner:
@@ -150,9 +154,23 @@ class AgentToolGraph:
             ])
         else:
             response = agent.propose(state["current_prompt"])
-
+        
         states = dict(state.get("provider_states", {}))
         states[agent.name] = agent.provider.export_state()
+
+        sources = list(state.get("sources", []))
+        seen_urls = {source["url"] for source in sources}
+
+        for source in response.sources:
+            if source["url"] not in seen_urls:
+                sources.append(source)
+                seen_urls.add(source["url"])
+
+        web_search_used = (
+            state.get("web_search_used", False)
+            or response.web_search_used
+        )
+
         common = {
             "provider_states": states,
             "llm_steps": steps + 1,
@@ -162,6 +180,8 @@ class AgentToolGraph:
             "handoff_request": None,
             "handoff_result": None,
             "return_text": None,
+            "sources": sources,
+            "web_search_used": web_search_used,
         }
 
         handoffs = [c for c in response.tool_calls if c.name == HANDOFF_TOOL_NAME]
