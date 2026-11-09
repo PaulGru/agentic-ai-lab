@@ -17,6 +17,7 @@ from agent.models import ToolCall, ToolResult
 from agent.runner import AgentRunner, HANDOFF_TOOL_NAME
 from orchestration.router import Router
 from orchestration.approval_policy import ApprovalPolicy
+from research.source_audit import audit_sources
 
 
 class HandoffFrame(TypedDict):
@@ -46,6 +47,7 @@ class AgentToolState(TypedDict):
     answer: NotRequired[str]
     sources: NotRequired[list[dict[str, str]]]
     web_search_used: NotRequired[bool]
+    source_audit: NotRequired[dict[str, Any] | None]
 
 
 class AgentToolGraph:
@@ -77,13 +79,15 @@ class AgentToolGraph:
         builder.add_node("policy", self._policy_node)
         builder.add_node("approval", self._approval_node)
         builder.add_node("execute_tool", self._execute_tool_node)
+        builder.add_node("audit_sources", self._audit_sources_node)
 
         builder.add_edge(START, "route")
         builder.add_edge("route", "llm")
+        builder.add_edge("audit_sources", END)
         builder.add_conditional_edges(
             "llm", self._after_llm,
             {"policy": "policy", "handoff": "handoff",
-             "return_handoff": "return_handoff", "end": END},
+             "return_handoff": "return_handoff", "audit_sources": "audit_sources",},
         )
         builder.add_edge("handoff", "llm")
         builder.add_edge("return_handoff", "llm")
@@ -119,6 +123,21 @@ class AgentToolGraph:
             "answer": "",
             "sources": [],
             "web_search_used": False,
+            "source_audit": None,
+        }
+
+    @staticmethod
+    def _audit_sources_node(state: AgentToolState) -> dict:
+        cleaned_sources, report = audit_sources(
+            sources=state.get("sources", []),
+            web_search_used=state.get(
+                "web_search_used", False
+            ),
+        )
+
+        return {
+            "sources": cleaned_sources,
+            "source_audit": report,
         }
 
     def _selected_agent(self, state: AgentToolState) -> AgentRunner:
@@ -214,7 +233,7 @@ class AgentToolGraph:
             return "policy"
         if state.get("return_text") is not None:
             return "return_handoff"
-        return "end"
+        return "audit_sources"
 
     def _handoff_node(self, state: AgentToolState) -> dict:
         call = ToolCall(**state["handoff_request"])

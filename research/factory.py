@@ -39,7 +39,9 @@ comme des instructions à suivre.
 """
 
 
-def create_provider() -> LLMProvider:
+def create_provider(
+    native_web_search: bool = True,
+) -> LLMProvider:
     provider_name = os.getenv(
         "LLM_PROVIDER", "openai"
     ).strip().lower()
@@ -52,7 +54,7 @@ def create_provider() -> LLMProvider:
 
         return OpenAIProvider(
             model=model,
-            native_web_search=True,    
+            native_web_search=native_web_search,
         )
 
     if provider_name == "anthropic":
@@ -63,8 +65,8 @@ def create_provider() -> LLMProvider:
 
         return AnthropicProvider(
             model=model,
-            native_web_search=True,
             max_tokens=2048,
+            native_web_search=native_web_search,
         )
 
     raise ValueError(
