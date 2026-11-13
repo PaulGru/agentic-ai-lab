@@ -7,6 +7,7 @@ from providers.base import LLMProvider
 from providers.openai_provider import OpenAIProvider
 from providers.anthropic_provider import AnthropicProvider
 from tools.registry import ToolRegistry
+from research.source_audit import audit_sources
 
 
 
@@ -96,4 +97,5 @@ def build_research_graph(
     return AgentToolGraph(
         agent=agent,
         checkpointer=saver,
+        source_auditor=audit_sources,
     ).graph

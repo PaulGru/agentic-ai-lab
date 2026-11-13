@@ -5,7 +5,7 @@ idempotency is the tool's responsibility, not a LangGraph guarantee.
 """
 
 from dataclasses import asdict
-from typing import Any
+from typing import Any, Callable
 
 from typing_extensions import TypedDict, NotRequired
 
@@ -17,7 +17,6 @@ from agent.models import ToolCall, ToolResult
 from agent.runner import AgentRunner, HANDOFF_TOOL_NAME
 from orchestration.router import Router
 from orchestration.approval_policy import ApprovalPolicy
-from research.source_audit import audit_sources
 
 
 class HandoffFrame(TypedDict):
@@ -59,6 +58,7 @@ class AgentToolGraph:
         router: Router | None = None,
         max_handoff_depth: int = 3,
         max_llm_steps: int = 20,
+        source_auditor: Callable | None = None,
     ):
         if (agent is None) == (router is None):
             raise ValueError("Provide exactly one of agent or router")
@@ -70,6 +70,7 @@ class AgentToolGraph:
         self.policy = policy if policy is not None else ApprovalPolicy()
         self.max_handoff_depth = max_handoff_depth
         self.max_llm_steps = max_llm_steps
+        self.source_auditor = source_auditor
 
         builder = StateGraph(AgentToolState)
         builder.add_node("route", self._route_node)
@@ -126,13 +127,14 @@ class AgentToolGraph:
             "source_audit": None,
         }
 
-    @staticmethod
-    def _audit_sources_node(state: AgentToolState) -> dict:
-        cleaned_sources, report = audit_sources(
-            sources=state.get("sources", []),
-            web_search_used=state.get(
-                "web_search_used", False
-            ),
+    def _audit_sources_node(self, state: AgentToolState) -> dict:
+        if self.source_auditor is None:
+            return {
+                "source_audit": None,
+            }
+        cleaned_sources, report = self.source_auditor(
+            state.get("sources", []),
+            state.get("web_search_used", False),
         )
 
         return {
