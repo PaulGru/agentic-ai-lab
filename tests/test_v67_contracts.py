@@ -73,6 +73,9 @@ class V67ContractsTests(unittest.TestCase):
             "v64-pipeline:abc",
         )
 
+    def test_app_version(self):
+        self.assertEqual(app.version, "6.7")
+
 
 if __name__ == "__main__":
     unittest.main()
