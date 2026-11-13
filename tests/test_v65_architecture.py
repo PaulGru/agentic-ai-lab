@@ -23,4 +23,4 @@ class V65ArchitectureTests(unittest.TestCase):
         self.assertTrue(expected.issubset(registered), expected - registered)
 
     def test_current_version(self):
-        self.assertEqual(app.version, "6.6")
+        self.assertEqual(app.version, "6.7")

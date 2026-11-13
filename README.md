@@ -87,3 +87,8 @@ Exécution locale avec Docker Compose.
 
 Le déploiement cloud n'est pas nécessaire pour
 le développement actuel.
+
+## Documentation technique
+
+- [Architecture de référence](docs/ARCHITECTURE.md)
+- [Sécurité des futures expériences Python](docs/V7_SECURITY.md)

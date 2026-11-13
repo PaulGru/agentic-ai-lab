@@ -6,7 +6,7 @@ from api.core import lifespan
 from api.routes.research import router as research_router
 from api.routes.workflows import router as workflows_router
 
-app = FastAPI(title="Agentic AI Lab", version="6.6", lifespan=lifespan)
+app = FastAPI(title="Agentic AI Lab", version="6.7", lifespan=lifespan)
 
 
 @app.get("/health")

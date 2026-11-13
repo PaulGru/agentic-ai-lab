@@ -39,7 +39,12 @@ jobs:
         run: |
           docker compose exec -T api \
             python /app/scripts/smoke_v54.py
-
+      
+      - name: Run research HTTP contract tests
+        run: |
+          docker compose exec -T api \
+            python /app/scripts/smoke_v67.py
+            
       - name: Show logs on failure
         if: failure()
         run: docker compose logs --no-color --tail=100
