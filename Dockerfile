@@ -20,7 +20,8 @@ RUN useradd --system --uid 10001 lab \
 
 USER lab
 
-# Les chemins relatifs de la V4.5 partiront d'ici
+# Working directory shared with the local test service
 WORKDIR /app/data
 
-ENTRYPOINT ["python", "/app/demo_v45.py"]
+# Default execution for the pedagogical test container
+ENTRYPOINT ["python", "-m", "unittest", "discover", "-s", "/app/tests", "-v"]
