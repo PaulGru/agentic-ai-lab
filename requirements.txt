@@ -2,6 +2,8 @@
 openai==3.24.0
 anthropic
 
+python-dotenv==1.2.4
+
 # Agent orchestration
 langgraph==1.2.16
 
