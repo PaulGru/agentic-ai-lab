@@ -21,6 +21,8 @@ from research.critique.reporting import export_review, inspect_export
 from research.critique.revision import verify_revision
 from research.critique.rules import check_report_bindings
 from research.critique.store import ReviewStore
+from research.memory.integration import add_memory_options, open_session, session_from_options
+from research.memory.contracts import MemoryBinding
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -91,6 +93,7 @@ def postgres_url() -> str:
 def main(argv=None):
     parser = argparse.ArgumentParser(description="V8.6 — critique traçable et révision prospective")
     parser.add_argument("--store", default="runs_control/v86_reviews.sqlite3")
+    add_memory_options(parser)
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("preview", "offline", "start"):
         command = sub.add_parser(action)
@@ -139,7 +142,7 @@ def main(argv=None):
         store = ReviewStore(args.store)
         if store.get("session", request.review_id) is not None:
             raise ValueError("Cet identifiant existe déjà ; utiliser un nouvel identifiant.")
-        graph = ReviewWorkflow(store).build(InMemorySaver())
+        graph = ReviewWorkflow(store, memory=session_from_options(args)).build(InMemorySaver())
         cfg = config_for(request.review_id)
         graph.invoke({"input_document": request.model_dump(mode="json")}, cfg, durability="sync")
         pending = pending_review(graph.get_state(cfg))
@@ -164,7 +167,12 @@ def main(argv=None):
     with PostgresSaver.from_conn_string(postgres_url()) as saver:
         saver.setup()
         store = ReviewStore(args.store, read_only=args.action == "status")
-        graph = ReviewWorkflow(store).build(saver)
+        memory = session_from_options(args, read_only=args.action == "status")
+        review_id = load_request(args.input).review_id if args.action == "start" else args.review
+        saved_binding = store.get("memory_binding", review_id)
+        if saved_binding and memory is None:
+            memory = open_session(MemoryBinding.model_validate(saved_binding), read_only=args.action == "status")
+        graph = ReviewWorkflow(store, memory=memory).build(saver)
         if args.action == "start":
             request = load_request(args.input)
             cfg = config_for(request.review_id)

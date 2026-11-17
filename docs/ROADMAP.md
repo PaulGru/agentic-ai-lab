@@ -14,6 +14,7 @@
 | V8.5.1–V8.5.5 — moteur d'analyse | Fusionné | Ingestion vérifiée, descriptif, inférence pédagogique, validité, LangGraph |
 | **Handover Codex** | **Fusionné (PR #4)** | Documents de transmission intégrés ; audit en lecture seule effectué avant V8.6 |
 | **V8.6 — Scientific Critic & Revision** | **Implémenté sur branche dédiée, non fusionné** | Contrats, preuves vérifiées, règles, journal durable, assistance multi-provider, révisions et HITL ; voir le guide V8.6 |
+| **V8.7 — Research Memory** | **Implémentée sur branche dédiée, non fusionnée** | 273 tests Windows réussis, dont 19 tests mémoire ; contrôle PostgreSQL séparé dans la CI |
 
 **Attention :** « fusionné » ne veut pas dire « prêt pour une recherche ACL » : la chaîne est encore partiellement composée de démonstrateurs indépendants, et aucun essai HPC réel n'a été exécuté.
 
@@ -55,12 +56,15 @@ nécessitera une décision distincte de la publication de la branche.
 
 | Phase | Objectif | Condition de succès |
 |---|---|---|
-| **V8.7 — Scientific Paper Writer** | Générer un manuscrit scientifique structuré et révisable | Affirmations liées aux sources/artefacts ; limites et absence de données réelles explicitement indiquées |
-| **V8.8 — End-to-End Integration & Evaluation (proposée)** | Relier toutes les briques et mesurer autonomie, coûts, fiabilité, reprises et qualité | Tests négatifs et scénarios reproductibles, sans dépendance obligatoire à HPC |
+| **V8.7 — Research Memory & Knowledge Management** | Retrouver les connaissances, épisodes et décisions entre sessions et providers | Sources et projets préservés, souvenirs obsolètes exclus, récupération traçable et bornée ; voir [le guide](V8_7_RESEARCH_MEMORY.md) |
+| **V8.8 — Scientific Paper Writer (renumérotée)** | Générer un manuscrit scientifique structuré et révisable | Affirmations liées aux sources/artefacts ; limites et absence de données réelles explicitement indiquées |
+| **V8.9 — End-to-End Integration & Evaluation (proposée)** | Relier toutes les briques et mesurer autonomie, coûts, fiabilité, reprises et qualité | Tests négatifs et scénarios reproductibles, sans dépendance obligatoire à HPC |
 | **Backend HPC réel (à planifier)** | Connecter un adaptateur Slurm/SSH au contrat `ExecutionBackend` | Validation avec les règles et accès réels de Jean Zay, tâches minimales approuvées, coûts/quotas contrôlés |
 | **V9 — Research Campaign (proposée)** | Utiliser le système pour la vraie question sur la robustesse agentique | Protocole scientifique pré-enregistré, modèles d'étude distincts des agents, réplications contrôlées, statistiques justifiées et revue humaine |
 
-V8.8, le backend HPC et V9 sont des **propositions**, pas des engagements déjà livrés. L'accès Jean Zay et la sélection des modèles évalués sont encore à confirmer.
+La mémoire V8.7 est insérée avant la rédaction, à la suite de la revue de la
+feuille de route. V8.8, V8.9, le backend HPC et V9 restent à construire.
+L'accès Jean Zay et la sélection des modèles évalués sont encore à confirmer.
 
 ## 5. Premier message conseillé à Codex
 

@@ -67,7 +67,7 @@ class ReviewStore:
 
     def put(self, kind: str, artifact_id: str, review_id: str, document: dict) -> str:
         self._write()
-        if kind not in {"session", "bundle", "review", "proposal", "decision", "approved_revision"}:
+        if kind not in {"session", "bundle", "review", "proposal", "decision", "approved_revision", "memory_binding", "memory_context"}:
             raise ValueError("Unknown review artifact kind")
         text, digest = canonical_json(document), fingerprint(document)
         if len(text.encode("utf-8")) > 1_048_576:

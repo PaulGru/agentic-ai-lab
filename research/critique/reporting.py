@@ -61,6 +61,16 @@ def export_review(store: ReviewStore, review_id: str, destination: str | Path) -
                                           allow_nan=False, indent=2) + "\n").encode("utf-8"),
         "review.md": render_review(bundle, report).encode("utf-8"),
     }
+    context = store.get("memory_context", review_id)
+    if context is not None:
+        from research.memory.contracts import MemoryContext
+        context = MemoryContext.model_validate(context)
+        lines = ["", "## Mémoire de recherche consultée", "",
+                 "Instantané historique ; ces souvenirs ne constituent aucune autorisation ni preuve scientifique.", ""]
+        for hit in context.hits:
+            lines.append(f"- {html.escape(hit.title)} — {hit.memory_id} ({hit.scope}, {hit.status})")
+            lines.append("  " + html.escape(hit.excerpt).replace("\n", " "))
+        outputs["review.md"] += ("\n".join(lines) + "\n").encode("utf-8")
     manifest = {"schema_version": "8.6", "complete": True,
                 "files": {name: hashlib.sha256(data).hexdigest() for name, data in outputs.items()}}
     outputs["manifest.json"] = (canonical_json(manifest) + "\n").encode("utf-8")

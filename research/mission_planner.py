@@ -53,18 +53,25 @@ Réponds UNIQUEMENT avec un objet JSON, sans Markdown, avec exactement ces clés
 
 
 class MissionPlanner:
-    def __init__(self, provider: LLMProvider):
+    def __init__(self, provider: LLMProvider, *, memory=None):
+        from research.memory.integration import MEMORY_INSTRUCTIONS
+        self.memory = memory
+        self.last_memory_context = None
         self.agent = AgentRunner(
             name="mission_planner",
             description="Formalise un programme de recherche scientifique",
-            instructions=MISSION_INSTRUCTIONS,
+            instructions=MISSION_INSTRUCTIONS + (MEMORY_INSTRUCTIONS if memory else ""),
             provider=provider,
             registry=ToolRegistry(),
         )
 
     def propose(self, brief_sections: dict[str, str]) -> ResearchMission:
+        payload = brief_sections
+        if self.memory:
+            payload, self.last_memory_context = self.memory.enrich(
+                {"brief": brief_sections}, "mission_planner", brief_sections.get("Question", "recherche"))
         response = self.agent.propose(
-            json.dumps(brief_sections, ensure_ascii=False)
+            json.dumps(payload, ensure_ascii=False)
         )
         if response.tool_calls or not response.text:
             raise ValueError("Mission planner must return JSON without tool calls")

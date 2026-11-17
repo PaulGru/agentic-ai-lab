@@ -1,6 +1,7 @@
 """V8.3 — PowerShell-compatible experimental design CLI (no execution)."""
 
 import argparse
+from research.memory.integration import add_memory_options, session_from_options
 import json
 import re
 from pathlib import Path
@@ -118,11 +119,12 @@ def main():
         if action == "resume":
             command.add_argument("--decision", choices=["approve", "reject"], required=True)
 
+    add_memory_options(parser)
     args = parser.parse_args()
     cfg = config_for(args.thread)
     with PostgresSaver.from_conn_string(database_url()) as saver:
         saver.setup()
-        graph = build_design_graph(saver)
+        graph = build_design_graph(saver, memory=session_from_options(args, read_only=args.action in {"status", "export"}))
         snapshot = graph.get_state(cfg)
         if args.action == "status":
             show_state(graph, cfg)
@@ -151,6 +153,7 @@ def main():
                 "mission_sha256": pending["mission_sha256"],
                 "literature_input_sha256": pending["literature_input_sha256"],
                 "design_sha256": pending["design_sha256"],
+                **({"memory_context_sha256": pending["memory_context_sha256"]} if "memory_context_sha256" in pending else {}),
             }), config=cfg, durability="sync")
         if args.action in ("resume", "export"):
             values = graph.get_state(cfg).values

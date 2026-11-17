@@ -46,11 +46,14 @@ Une seule constatation par work_id et au maximum huit constatations.
 
 
 class LiteratureAnalyst:
-    def __init__(self, provider: LLMProvider):
+    def __init__(self, provider: LLMProvider, *, memory=None):
+        from research.memory.integration import MEMORY_INSTRUCTIONS
+        self.memory = memory
+        self.last_memory_context = None
         self.agent = AgentRunner(
             name="literature_analyst",
             description="Relie les affirmations à des extraits réellement récupérés",
-            instructions=LITERATURE_INSTRUCTIONS,
+            instructions=LITERATURE_INSTRUCTIONS + (MEMORY_INSTRUCTIONS if memory else ""),
             provider=provider,
             registry=ToolRegistry(),
         )
@@ -65,6 +68,8 @@ class LiteratureAnalyst:
             },
             "catalog": [paper.model_dump() for paper in catalog.papers],
         }
+        if self.memory:
+            payload, self.last_memory_context = self.memory.enrich(payload, "literature_analyst", mission.research_question)
         response = self.agent.propose(json.dumps(payload, ensure_ascii=False))
         if response.tool_calls or not response.text:
             raise ValueError("Literature analyst must return JSON without tool calls")

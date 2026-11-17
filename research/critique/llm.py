@@ -32,7 +32,7 @@ Réponds par un seul objet JSON conforme au schéma joint, sans Markdown.
 
 
 def make_request(bundle: EvidenceBundle, report: ReviewReport, settings: LLMSettings, *,
-                 review_id: str, role: str, cycle: int = 1, feedback: str = "") -> LLMRequest:
+                 review_id: str, role: str, cycle: int = 1, feedback: str = "", memory_context: dict | None = None) -> LLMRequest:
     check_report_bindings(bundle, report)
     payload = {"evidence": bundle.model_dump(mode="json"), "review": report.model_dump(mode="json"),
                "human_feedback": feedback}
@@ -54,6 +54,11 @@ bloc ; les dictionnaires de mêmes clés se comparent par feuilles.
 """
     else:
         raise ValueError("Unknown LLM role")
+    if memory_context is not None:
+        from research.memory.contracts import MemoryContext
+        from research.memory.integration import MEMORY_INSTRUCTIONS
+        payload["research_memory"] = MemoryContext.model_validate(memory_context).model_dump(mode="json")
+        instruction += MEMORY_INSTRUCTIONS
     return LLMRequest(review_id=review_id, role=role, cycle=cycle, bundle_sha256=bundle.fingerprint(),
                       settings=settings, prompt=canonical_json(payload),
                       instructions=instruction + "\nSCHÉMA :\n" + canonical_json(schema))

@@ -14,6 +14,7 @@ from research.literature import (
 )
 from research.literature_analyst import LiteratureAnalyst
 from research.literature_search import OpenAlexClient, retrieve_catalog
+from research.memory.integration import approval_memory, checkpoint_memory, memory_decision_matches, verify_checkpoint_memory
 
 
 class LiteratureState(TypedDict, total=False):
@@ -23,6 +24,8 @@ class LiteratureState(TypedDict, total=False):
     review: dict[str, Any]
     review_sha256: str
     status: str
+    memory_context: dict[str, Any]
+    memory_binding: dict[str, Any]
 
 
 class LiteratureWorkflow:
@@ -34,12 +37,14 @@ class LiteratureWorkflow:
         max_queries: int = 4,
         per_query: int = 5,
         search_queries: list[str] | None = None,
+        memory=None,
     ):
         self.client = client
         self.provider_factory = provider_factory
         self.max_queries = max_queries
         self.per_query = per_query
         self.search_queries = search_queries
+        self.memory = memory
 
     def discover_node(self, state: LiteratureState):
         mission = validate_approved_mission(state["mission_document"])
@@ -57,16 +62,18 @@ class LiteratureWorkflow:
     def analyze_node(self, state: LiteratureState):
         mission = validate_approved_mission(state["mission_document"])
         catalog = LiteratureCatalog.model_validate(state["catalog"])
-        review = LiteratureAnalyst(self.provider_factory()).analyze(mission, catalog)
+        analyst = LiteratureAnalyst(self.provider_factory(), memory=self.memory)
+        review = analyst.analyze(mission, catalog)
         raw = review.model_dump()
         return {
             "review": raw,
             "review_sha256": digest_json(raw),
             "status": "awaiting_approval",
+            **checkpoint_memory(self.memory, analyst.last_memory_context),
         }
 
-    @staticmethod
-    def approval_node(state: LiteratureState):
+    def approval_node(self, state: LiteratureState):
+        verify_checkpoint_memory(self.memory, state)
         # No external side effects before interrupt; resuming never re-fetches or re-prompts.
         decision = interrupt({
             "kind": "literature_review_approval",
@@ -75,7 +82,9 @@ class LiteratureWorkflow:
             "review_sha256": state["review_sha256"],
             "paper_count": len(state["catalog"]["papers"]),
             "review": state["review"],
+            **approval_memory(state),
         })
+        verify_checkpoint_memory(self.memory, state)
         catalog = LiteratureCatalog.model_validate(state["catalog"])
         review = LiteratureReview.model_validate(state["review"])
         validate_evidence(review, catalog)
@@ -88,6 +97,7 @@ class LiteratureWorkflow:
             and decision.get("review_sha256") == state["review_sha256"]
             and digest_json(state["catalog"]) == state["catalog_sha256"]
             and digest_json(state["review"]) == state["review_sha256"]
+            and memory_decision_matches(state, decision)
         )
         return {"status": "approved" if accepted else "rejected"}
 
@@ -105,7 +115,7 @@ class LiteratureWorkflow:
 
 def build_literature_graph(
     saver, *, client=None, provider_factory=None, max_queries=4,
-    per_query=5, search_queries: list[str] | None = None,
+    per_query=5, search_queries: list[str] | None = None, memory=None,
 ):
     if client is None:
         client = OpenAlexClient()
@@ -113,7 +123,7 @@ def build_literature_graph(
         provider_factory = lambda: create_provider(native_web_search=False)
     return LiteratureWorkflow(
         client, provider_factory, max_queries=max_queries,
-        per_query=per_query, search_queries=search_queries,
+        per_query=per_query, search_queries=search_queries, memory=memory,
     ).build(saver)
 
 

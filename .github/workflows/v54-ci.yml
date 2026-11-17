@@ -2,7 +2,7 @@ name: Agentic AI Lab - CI
 
 on:
   push:
-    branches: [main, 'feat/v8.6-*']
+    branches: [main, 'feat/v8.6-*', 'feat/v8.7-*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -49,6 +49,11 @@ jobs:
         run: |
           docker compose exec -T api \
             python -m scripts.check_v86_postgres
+
+      - name: Verify V8.7 PostgreSQL research memory across sessions
+        run: |
+          docker compose exec -T api \
+            python -m scripts.check_v87_memory
             
       - name: Show logs on failure
         if: failure()

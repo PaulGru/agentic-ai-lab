@@ -13,6 +13,7 @@ from langgraph.types import Command
 
 from research.mission import parse_brief
 from research.mission_graph import build_mission_graph, pending_approval
+from research.memory.integration import add_memory_options, session_from_options
 
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -69,6 +70,7 @@ def export_approved_mission(values: dict, thread: str):
 
 def main():
     parser = argparse.ArgumentParser(description="V8.1 Research Mission")
+    add_memory_options(parser)
     commands = parser.add_subparsers(dest="action", required=True)
     for action in ("start", "status", "resume"):
         cmd = commands.add_parser(action)
@@ -84,7 +86,7 @@ def main():
 
     with PostgresSaver.from_conn_string(database_url()) as saver:
         saver.setup()
-        graph = build_mission_graph(saver)
+        graph = build_mission_graph(saver, memory=session_from_options(args, read_only=args.action == "status"))
         snapshot = graph.get_state(cfg)
 
         if args.action == "status":
@@ -113,6 +115,7 @@ def main():
                     "decision": args.decision,
                     "brief_sha256": pending["brief_sha256"],
                     "mission_sha256": pending["mission_sha256"],
+                    **({"memory_context_sha256": pending["memory_context_sha256"]} if "memory_context_sha256" in pending else {}),
                 }),
                 config=cfg,
                 durability="sync",

@@ -38,6 +38,8 @@ class ReviewState(TypedDict, total=False):
     cycle: int
     feedback: str
     status: str
+    memory_context_sha256: str
+    memory_indexed_items: int
 
 
 def config_for(review_id: str) -> dict:
@@ -57,9 +59,24 @@ def pending_review(snapshot) -> dict | None:
 
 class ReviewWorkflow:
     def __init__(self, store: ReviewStore, *,
-                 provider_factory: Callable[[LLMRequest], LLMProvider] = create_bounded_provider):
+                 provider_factory: Callable[[LLMRequest], LLMProvider] = create_bounded_provider, memory=None):
         self.store = store
         self.provider_factory = provider_factory
+        self.memory = memory
+
+    def _memory_snapshot(self, review_id):
+        binding = self.store.get("memory_binding", review_id)
+        context = self.store.get("memory_context", review_id)
+        if binding is None and context is None:
+            return None
+        from research.memory.contracts import MemoryBinding, MemoryContext
+        if binding is None or context is None:
+            raise ValueError("Memory retrieval is incomplete")
+        checked_binding = MemoryBinding.model_validate(binding)
+        checked_context = MemoryContext.model_validate(context)
+        if checked_context.project_id != checked_binding.project_id:
+            raise PermissionError("Stored memory context belongs to another project")
+        return checked_context.model_dump(mode="json")
 
     @staticmethod
     def _manager(request: ReviewInput):
@@ -73,6 +90,14 @@ class ReviewWorkflow:
         recorded = self.store.require("bundle", request.review_id)
         if bundle.model_dump(mode="json") != recorded or state["bundle_document"] != recorded:
             raise ValueError("Original sources or checkpoint evidence changed during the review")
+        binding = self.store.get("memory_binding", request.review_id)
+        if binding is not None:
+            if self.memory is None or self.memory.binding.model_dump(mode="json") != binding:
+                raise PermissionError("Resume requires the recorded research memory binding")
+            context = self.store.get("memory_context", request.review_id)
+            if context is not None:
+                from research.memory.contracts import MemoryContext
+                self.memory.verify(MemoryContext.model_validate(context))
         return request, bundle
 
     def _cycle(self, state: ReviewState, request: ReviewInput) -> int:
@@ -91,7 +116,8 @@ class ReviewWorkflow:
         call = self.store.call(f"{request.review_id}-critique-1")
         if call and call["phase"] == "completed":
             llm_request = LLMRequest.model_validate(call["request"])
-            expected = make_request(bundle, report, request.llm, review_id=request.review_id, role="critique")
+            expected = make_request(bundle, report, request.llm, review_id=request.review_id, role="critique",
+                                    memory_context=self._memory_snapshot(request.review_id))
             if llm_request != expected:
                 raise ValueError("Completed critic request differs from the review evidence")
             report = with_suggestions(bundle, report, CriticSuggestions.model_validate(call["result"]))
@@ -109,15 +135,38 @@ class ReviewWorkflow:
         bundle = load_input(request)  # fails before allocating any LLM call
         self.store.put("session", request.review_id, request.review_id, request.model_dump(mode="json"))
         self.store.put("bundle", request.review_id, request.review_id, bundle.model_dump(mode="json"))
+        if self.memory:
+            self.store.put("memory_binding", request.review_id, request.review_id, self.memory.binding.model_dump(mode="json"))
         return {"input_document": request.model_dump(mode="json"), "bundle_document": bundle.model_dump(mode="json"),
                 "cycle": 1, "feedback": "", "llm_approved": False, "status": "evidence_verified"}
+
+    def retrieve_memory_node(self, state):
+        request, bundle = self._inputs(state)
+        if self.store.get("memory_context", request.review_id) is not None:
+            recorded = self._memory_snapshot(request.review_id)
+            # A crash after the immutable write must not select a different
+            # context before the LangGraph checkpoint is committed.
+            from research.memory.contracts import MemoryContext
+            return {"memory_context_sha256": MemoryContext.model_validate(recorded).fingerprint()}
+        question = (bundle.context.mission_document["mission"]["research_question"] if bundle.context
+                    else bundle.source_document.get("metric_name", "synthetic mean"))
+        context = self.memory.retrieve("scientific_critic", "réplication refus protocole " + question,
+                                       exclude_review_id=request.review_id)
+        self.store.put("memory_context", request.review_id, request.review_id, context.model_dump(mode="json"))
+        return {"memory_context_sha256": context.fingerprint()}
+
+    def publish_memory_node(self, state):
+        request, _ = self._inputs(state)
+        items = self.memory.memory.ingest_review(self.memory.binding.project_id, self.store.path, request.review_id)
+        return {"memory_indexed_items": len(items)}
 
     def rules_node(self, state):
         request, bundle = self._inputs(state)
         report = deterministic_review(bundle, self._manager(request))
         result = {"report_document": report.model_dump(mode="json"), "status": "deterministic_review"}
         if request.assist_critique:
-            pending = make_request(bundle, report, request.llm, review_id=request.review_id, role="critique")
+            pending = make_request(bundle, report, request.llm, review_id=request.review_id, role="critique",
+                                   memory_context=self._memory_snapshot(request.review_id))
             result.update(pending_call=pending.model_dump(mode="json"), status="awaiting_llm_approval")
         return result
 
@@ -126,11 +175,13 @@ class ReviewWorkflow:
         cycle = self._cycle(state, request)
         if pending.role == "critique":
             report = deterministic_review(bundle, self._manager(request))
-            expected = make_request(bundle, report, request.llm, review_id=request.review_id, role="critique")
+            expected = make_request(bundle, report, request.llm, review_id=request.review_id, role="critique",
+                                    memory_context=self._memory_snapshot(request.review_id))
         else:
             report = self._frozen_report(state, request, bundle)
             expected = make_request(bundle, report, request.llm, review_id=request.review_id,
-                                    role="revision", cycle=cycle, feedback=state.get("feedback", ""))
+                                    role="revision", cycle=cycle, feedback=state.get("feedback", ""),
+                                    memory_context=self._memory_snapshot(request.review_id))
         if pending != expected:
             raise PermissionError("Pending LLM request differs from the exact evidence/policy")
         return pending
@@ -192,7 +243,8 @@ class ReviewWorkflow:
         report = self._frozen_report(state, request, bundle)
         if request.assist_revision:
             pending = make_request(bundle, report, request.llm, review_id=request.review_id,
-                                   role="revision", cycle=cycle, feedback=state.get("feedback", ""))
+                                   role="revision", cycle=cycle, feedback=state.get("feedback", ""),
+                                   memory_context=self._memory_snapshot(request.review_id))
             return {"pending_call": pending.model_dump(mode="json"), "llm_approved": False,
                     "status": "awaiting_llm_approval"}
         token = fingerprint({"bundle": bundle.fingerprint(), "report": report.fingerprint(), "cycle": cycle})
@@ -273,18 +325,27 @@ class ReviewWorkflow:
         ):
             builder.add_node(name, handler)
         builder.add_edge(START, "verify_evidence")
-        builder.add_edge("verify_evidence", "rules")
+        if self.memory:
+            builder.add_node("retrieve_research_memory", self.retrieve_memory_node)
+            builder.add_node("publish_review_memory", self.publish_memory_node)
+            builder.add_node("publish_decision_memory", self.publish_memory_node)
+            builder.add_edge("verify_evidence", "retrieve_research_memory")
+            builder.add_edge("retrieve_research_memory", "rules")
+            builder.add_edge("save_review", "publish_review_memory")
+            builder.add_edge("revision_approval", "publish_decision_memory")
+        else:
+            builder.add_edge("verify_evidence", "rules")
         builder.add_conditional_edges("rules", lambda s: "llm_approval" if s["status"] == "awaiting_llm_approval" else "save_review",
                                       {"llm_approval": "llm_approval", "save_review": "save_review"})
         builder.add_conditional_edges("llm_approval", self._after_llm_approval,
                                       {"llm_call": "llm_call", "save_review": "save_review", END: END})
         builder.add_conditional_edges("llm_call", lambda s: "save_review" if s["pending_call"]["role"] == "critique" else "validate_revision",
                                       {"save_review": "save_review", "validate_revision": "validate_revision"})
-        builder.add_conditional_edges("save_review", lambda s: "revision_input" if s["bundle_document"]["context"] else END,
+        builder.add_conditional_edges("publish_review_memory" if self.memory else "save_review", lambda s: "revision_input" if s["bundle_document"]["context"] else END,
                                       {"revision_input": "revision_input", END: END})
         builder.add_conditional_edges("revision_input", lambda s: {"awaiting_llm_approval": "llm_approval", "draft_ready": "validate_revision"}.get(s["status"], END),
                                       {"llm_approval": "llm_approval", "validate_revision": "validate_revision", END: END})
         builder.add_edge("validate_revision", "revision_approval")
-        builder.add_conditional_edges("revision_approval", lambda s: "revision_input" if s["status"] == "needs_revision" else END,
+        builder.add_conditional_edges("publish_decision_memory" if self.memory else "revision_approval", lambda s: "revision_input" if s["status"] == "needs_revision" else END,
                                       {"revision_input": "revision_input", END: END})
         return builder.compile(checkpointer=saver)
