@@ -1,0 +1,15 @@
+{
+  "schema_version": "8.4.6",
+  "campaign_id": "v846-pilot-001",
+  "description": "Engineering-only pilot: two real isolated arithmetic workloads, not LLM research",
+  "resources": {
+    "cpus": 1,
+    "memory_mb": 256,
+    "gpus": 0,
+    "walltime_minutes": 2
+  },
+  "runs": [
+    {"run_id": "baseline", "values": [1, 2, 3, 4, 5], "seed": 42},
+    {"run_id": "variant", "values": [2, 4, 6, 8, 10], "seed": 43}
+  ]
+}

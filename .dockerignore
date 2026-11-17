@@ -15,3 +15,13 @@ data/
 
 certs/
 compose.override.yaml
+
+# V8 - Generated research artifacts
+/missions/
+/runs_control/
+/runs_local/
+/v84_bindings.json
+
+# V8 - Delivery archives
+/agentic_ai_lab_*.zip
+/tests/agentic_ai_lab_*.zip
