@@ -17,7 +17,11 @@ from research.mission_planner import MissionPlanner
 from tests.fakes import FakeProvider
 
 
-BRIEF_PATH = Path(__file__).resolve().parents[1] / "research_brief.md"
+BRIEF_PATH = (
+    Path(__file__).resolve().parent
+    / "fixtures"
+    / "research_brief.md"
+)
 
 
 def valid_mission():
