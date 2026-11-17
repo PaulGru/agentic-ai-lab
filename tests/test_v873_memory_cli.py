@@ -5,12 +5,14 @@ import sys
 import tempfile
 import unittest
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 class MemoryCLITests(unittest.TestCase):
     def run_cli(self, db, *args, input=""):
         return subprocess.run([sys.executable, "-X", "utf8", "-m", "scripts.demo_v87_memory",
                                "--db", str(db), "--project", "demo-project", *args],
-                              capture_output=True, input=input, encoding="utf-8", timeout=60)
+                              cwd=ROOT, capture_output=True, input=input, encoding="utf-8", timeout=60)
 
     def test_offline_import_query_and_human_note_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -49,7 +51,7 @@ class MemoryCLITests(unittest.TestCase):
             result = subprocess.run([sys.executable, "-X", "utf8", "-m", "scripts.demo_v86", "--memory-db", str(path),
                                      "--project", "demo-project", "--store", str(root / "reviews.db"), "offline",
                                      "--input", "examples/v86_review_input.json", "--out-dir", str(root / "export")],
-                                    capture_output=True, encoding="utf-8", timeout=90)
+                                    cwd=ROOT, capture_output=True, encoding="utf-8", timeout=90)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("Mémoire de recherche consultée", (root / "export" / "review.md").read_text(encoding="utf-8"))
             result = self.run_cli(path, "search", "--query", "indépendance", "--kind", "lesson")
