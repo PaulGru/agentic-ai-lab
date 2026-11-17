@@ -92,7 +92,7 @@ Le document plus ancien `docs/ARCHITECTURE.md` décrit surtout le socle **V6.7**
 2. Pas de **backend Slurm réel** ni de validation des environnements, quotas, modules, transferts et politiques de Jean Zay. Le simulateur ne vaut pas preuve de compatibilité HPC.
 3. Le backend local conserve certaines limites de reprise de workers après interruption ; la gestion des soumissions incertaines est prudente, pas une garantie exactly-once.
 4. L'analyse actuelle est pédagogique : agrégats et paires synthétiques ; pas encore de modèles de données pour vraies répétitions multi-factorielles ni de protocole statistique ACL.
-5. L'agent ne possède pas encore le **Scientific Critic & Revision** (V8.6), ni le **Scientific Paper Writer** (V8.7).
+5. Le **Scientific Critic & Revision** (V8.6) est implémenté sur une branche dédiée, non encore fusionnée dans le `main` de référence ; voir la section suivante. Le **Scientific Paper Writer** (V8.7) reste à construire.
 6. La CI de la PR #3 a été verte pour les tests présents dans le workflow ; cela **ne constitue pas** une validation d'accès Jean Zay, ni de campagne scientifique réelle.
 
 ## 8. Commandes et sources de vérité
@@ -117,3 +117,23 @@ La CI actuelle est `.github/workflows/v54-ci.yml` (tests sous Docker + smoke HTT
 ## 9. Suite
 
 **V8.6** : critique scientifique méthodologique, observations de validité, recommandations de révision avec traçabilité et approbation humaine. **V8.7** : rédaction d'un manuscrit appuyé sur des sources et données vérifiées. Une **V8.8 d'intégration** et une **V9 de recherche expérimentale réelle** sont envisagées, pas encore livrées. Voir `docs/ROADMAP.md`.
+
+## 10. Branche V8.6 — critique et révision
+
+`research/critique/` ajoute un dossier de preuves reconstruit par V8.5, des
+critiques déterministes, des remarques LLM facultatives et non vérifiées
+sémantiquement, un journal SQLite distinct et un graphe `v86-critic:`.
+Les données et les versions précédentes sont conservées. Une ouverture
+explicitement en lecture seule du ledger V8.4 évite toute modification des jobs.
+
+Chaque appel LLM exige une autorisation exacte, avec limites de sortie, délai
+et retries désactivés. Une issue incertaine n'est jamais relancée automatiquement.
+Une révision du protocole V8.3 est diffée, justifiée, revalidée et soumise à un
+autre HITL. Sa version V8.6 est prospective, établie après consultation des
+résultats et toujours non exécutée. Aucun lien fictif entre design et résultats
+n'est créé. Aucun garde-fou scientifique V8.5 n'est activé ou contourné.
+
+Le [guide V8.6](V8_6_SCIENTIFIC_CRITIC_REVISION.md) explique les sept sous-étapes,
+les exemples fictifs, le mode offline, la reprise PostgreSQL, la CI Windows et
+les limites. Cette branche ne constitue ni une campagne réelle ni une fusion
+déjà effectuée dans `main`.

@@ -1,0 +1,9 @@
+{
+  "review_id": "v86-demo-001",
+  "source_kind": "pedagogical_paired_fixture",
+  "source_path": "examples/v85_paired_fixture.json",
+  "context_path": "examples/v86_design_context.json",
+  "max_cycles": 2,
+  "assist_critique": false,
+  "assist_revision": false
+}

@@ -17,10 +17,22 @@ class OpenAIProvider(LLMProvider):
         self,
         model: str,
         native_web_search: bool = False,
+        *,
+        max_output_tokens: int | None = None,
+        max_retries: int | None = None,
+        timeout: float | None = None,
     ):
-        self.client = OpenAI()
+        if max_output_tokens is not None and (type(max_output_tokens) is not int or max_output_tokens < 1):
+            raise ValueError("max_output_tokens must be a positive integer")
+        options = {}
+        if max_retries is not None:
+            options["max_retries"] = max_retries
+        if timeout is not None:
+            options["timeout"] = timeout
+        self.client = OpenAI(**options)
         self.model = model
         self.native_web_search = native_web_search
+        self.max_output_tokens = max_output_tokens
         self._previous_response_id: str | None = None
 
     def _request_tools(
@@ -50,6 +62,8 @@ class OpenAIProvider(LLMProvider):
             "model": self.model,
             "input": prompt,
         }
+        if self.max_output_tokens is not None:
+            request["max_output_tokens"] = self.max_output_tokens
 
         if instructions:
             request["instructions"] = instructions
@@ -88,6 +102,8 @@ class OpenAIProvider(LLMProvider):
                 for result in results
             ],
         }
+        if self.max_output_tokens is not None:
+            request["max_output_tokens"] = self.max_output_tokens
 
         if instructions:
             request["instructions"] = instructions

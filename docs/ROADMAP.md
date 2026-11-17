@@ -12,7 +12,8 @@
 | V8.3 — Experimental Design | Fusionné | Contrats et approbations testés |
 | V8.4.1–V8.4.6 — moteur expérimental | Fusionné | Backends simulés/local, registre durable, HITL, pilote Docker synthétique testé localement |
 | V8.5.1–V8.5.5 — moteur d'analyse | Fusionné | Ingestion vérifiée, descriptif, inférence pédagogique, validité, LangGraph |
-| **Handover Codex** | **En préparation** | `AGENTS.md`, `docs/PROJECT_CONTEXT.md`, `docs/ROADMAP.md` ; relire puis merger la PR documentaire |
+| **Handover Codex** | **Fusionné (PR #4)** | Documents de transmission intégrés ; audit en lecture seule effectué avant V8.6 |
+| **V8.6 — Scientific Critic & Revision** | **Implémenté sur branche dédiée, non fusionné** | Contrats, preuves vérifiées, règles, journal durable, assistance multi-provider, révisions et HITL ; voir le guide V8.6 |
 
 **Attention :** « fusionné » ne veut pas dire « prêt pour une recherche ACL » : la chaîne est encore partiellement composée de démonstrateurs indépendants, et aucun essai HPC réel n'a été exécuté.
 
@@ -20,11 +21,11 @@
 
 - [x] Fusionner la V8.1–V8.5 dans `main` après CI réussie (PR #3).
 - [x] Corriger la fixture V8.1 indépendante du brief scientifique privé.
-- [ ] Relire et fusionner la PR contenant les trois documents de transmission.
+- [x] Relire et fusionner la PR contenant les trois documents de transmission (PR #4).
 - [ ] Mettre à jour le dépôt local avec `git switch main` puis `git pull --ff-only origin main` **après** vérification de `git status`.
 - [ ] Vérifier que le dépôt local n'a ni secrets ajoutés ni modifications non enregistrées.
 - [ ] Installer/ouvrir l'extension Codex officielle dans VS Code et ouvrir **la racine de ce dépôt**.
-- [ ] Confier à Codex un **audit en lecture seule** avant tout développement V8.6.
+- [x] Confier à Codex un **audit en lecture seule** avant tout développement V8.6.
 - [ ] Comparer cet audit aux contrats réels et corriger les incohérences documentaires avant de démarrer les nouvelles fonctionnalités.
 
 La mémoire conversationnelle de ChatGPT et celle de Codex ne sont pas automatiquement transférées. **Ces fichiers versionnés + les contrats et tests sont la référence durable du projet.**
@@ -33,7 +34,7 @@ La mémoire conversationnelle de ChatGPT et celle de Codex ne sont pas automatiq
 
 **Pourquoi ?** Un système qui sait rédiger un rapport d'analyse sans remettre en question sa méthode peut produire des conclusions trompeuses. Le critique doit détecter les insuffisances, expliquer leur gravité et proposer des révisions vérifiables, tout en préservant l'historique.
 
-### Objectifs proposés (à concevoir avec Codex, pas encore implémentés)
+### Périmètre implémenté sur la branche V8.6
 
 1. **Contrat de critique structuré** : `CritiqueIssue` (cible, preuve, gravité, type, recommandation) et `ReviewReport` avec provenance / empreintes.
 2. **Règles déterministes préalables** : absence d'artefact, incohérence de checksum, réplication insuffisante, métrique non définie, assertions non étayées, confusion simulation/données réelles.
@@ -42,6 +43,13 @@ La mémoire conversationnelle de ChatGPT et celle de Codex ne sont pas automatiq
 5. **Tests pédagogiques** : rapport synthétique valide, critique mal fondée, référence introuvable, intégrité altérée, reprise après interruption, refus humain et absence d'effets externes.
 
 **Définition de terminé V8.6 :** aucune critique ne transforme des données fictives en faits, tout verdict est rattaché à des preuves, toute révision préserve le document précédent, les tests passent et l'approbation humaine précède les opérations sensibles.
+
+Le détail des sept sous-étapes, des commandes, des tests et des limites figure
+dans [V8_6_SCIENTIFIC_CRITIC_REVISION.md](V8_6_SCIENTIFIC_CRITIC_REVISION.md).
+L'approbation d'une révision n'autorise aucun job ; le lien générique entre
+design V8.3 et exécution reste à construire. L'inférence scientifique reste
+interdite sur les sources synthétiques actuelles. Une fusion dans `main`
+nécessitera une décision distincte de la publication de la branche.
 
 ## 4. Après V8.6
 

@@ -17,8 +17,16 @@ class AnthropicProvider(LLMProvider):
         model: str,
         max_tokens: int = 1024,
         native_web_search: bool = False,
+        *,
+        max_retries: int | None = None,
+        timeout: float | None = None,
     ):
-        self.client = Anthropic()
+        options = {}
+        if max_retries is not None:
+            options["max_retries"] = max_retries
+        if timeout is not None:
+            options["timeout"] = timeout
+        self.client = Anthropic(**options)
         self.model = model
         self.max_tokens = max_tokens
         self.native_web_search = native_web_search

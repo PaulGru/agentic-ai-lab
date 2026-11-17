@@ -24,6 +24,11 @@ Construire progressivement un assistant capable de :
 
 L'architecture conserve une abstraction multi-provider.
 
+La branche V8.6 ajoute une critique traçable des analyses V8.5 et des révisions
+prospectives du protocole avec validation humaine. Voir le
+[guide V8.6](docs/V8_6_SCIENTIFIC_CRITIC_REVISION.md) et les
+[exemples entièrement fictifs](examples/V8_6_README.md).
+
 ## Fonctionnalités
 
 - Appels d'outils Python
