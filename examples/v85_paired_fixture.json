@@ -1,0 +1,21 @@
+{
+  "schema_version": "8.5.3",
+  "kind": "pedagogical_paired_fixture",
+  "dataset_id": "v85-synthetic-paired-001",
+  "metric_name": "synthetic.score",
+  "unit": "points",
+  "sign_flip_symmetry_assumed": true,
+  "scientific_evidence": false,
+  "pairs": [
+    {"pair_id": "T01", "baseline": 60, "variant": 62},
+    {"pair_id": "T02", "baseline": 64, "variant": 65},
+    {"pair_id": "T03", "baseline": 62, "variant": 65},
+    {"pair_id": "T04", "baseline": 68, "variant": 68},
+    {"pair_id": "T05", "baseline": 66, "variant": 70},
+    {"pair_id": "T06", "baseline": 65, "variant": 66},
+    {"pair_id": "T07", "baseline": 71, "variant": 73},
+    {"pair_id": "T08", "baseline": 72, "variant": 75},
+    {"pair_id": "T09", "baseline": 67, "variant": 68},
+    {"pair_id": "T10", "baseline": 69, "variant": 71}
+  ]
+}

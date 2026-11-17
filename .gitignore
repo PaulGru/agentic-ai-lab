@@ -18,3 +18,30 @@ v45_notes/
 
 certs/
 compose.override.yaml
+
+# V8 - Archives de livraison
+/agentic_ai_lab_*.zip
+/tests/agentic_ai_lab_*.zip
+/README_FIX_V844.md
+/README_INSTALL_V85.md
+
+# V8 - Configurations expérimentales locales
+/v84_bindings.json
+
+# V8 - Bases de données locales
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+
+# V8 - Résultats et artefacts d'exécution
+/runs_control/*
+!/runs_control/.gitignore
+
+/runs_local/*
+!/runs_local/.gitignore
+
+# V8 - Missions générées (conservées localement)
+/missions/
+
+research_brief.md
