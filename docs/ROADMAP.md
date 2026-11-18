@@ -13,8 +13,10 @@
 | V8.4.1–V8.4.6 — moteur expérimental | Fusionné | Backends simulés/local, registre durable, HITL, pilote Docker synthétique testé localement |
 | V8.5.1–V8.5.5 — moteur d'analyse | Fusionné | Ingestion vérifiée, descriptif, inférence pédagogique, validité, LangGraph |
 | **Handover Codex** | **Fusionné (PR #4)** | Documents de transmission intégrés ; audit en lecture seule effectué avant V8.6 |
-| **V8.6 — Scientific Critic & Revision** | **Implémenté sur branche dédiée, non fusionné** | Contrats, preuves vérifiées, règles, journal durable, assistance multi-provider, révisions et HITL ; voir le guide V8.6 |
-| **V8.7 — Research Memory** | **Implémentée sur branche dédiée, non fusionnée** | 273 tests Windows réussis, dont 19 tests mémoire ; contrôle PostgreSQL séparé dans la CI |
+| **V8.6 — Scientific Critic & Revision** | Inclus dans la livraison V8.9 | Contrats, preuves vérifiées, journal durable, assistance multi-provider et révisions approuvées |
+| **V8.7 — Research Memory** | Incluse dans la livraison V8.9 | Tests de mémoire locale, contrôle PostgreSQL et rappel des décisions lors du pilote |
+| **V8.8 — Scientific Paper Writer** | Livré avec le parcours V8.9 | Manuscrit et figure vérifiables depuis les données et décisions |
+| **V8.9 — End-to-End Integration & Evaluation** | Livré en mode pilote synthétique | Liaison cellule → job, reprise PostgreSQL, validations humaines et bilan d'exécution |
 
 **Attention :** « fusionné » ne veut pas dire « prêt pour une recherche ACL » : la chaîne est encore partiellement composée de démonstrateurs indépendants, et aucun essai HPC réel n'a été exécuté.
 
@@ -47,24 +49,24 @@ La mémoire conversationnelle de ChatGPT et celle de Codex ne sont pas automatiq
 
 Le détail des sept sous-étapes, des commandes, des tests et des limites figure
 dans [V8_6_SCIENTIFIC_CRITIC_REVISION.md](V8_6_SCIENTIFIC_CRITIC_REVISION.md).
-L'approbation d'une révision n'autorise aucun job ; le lien générique entre
-design V8.3 et exécution reste à construire. L'inférence scientifique reste
-interdite sur les sources synthétiques actuelles. Une fusion dans `main`
-nécessitera une décision distincte de la publication de la branche.
+La révision approuvée reste prospective. La V8.9 demande une décision
+d'exécution séparée et lie explicitement les cellules V8.3 aux seules tâches
+arithmétiques du pilote. Le catalogue scientifique reste une étape de V9.
 
 ## 4. Après V8.6
 
 | Phase | Objectif | Condition de succès |
 |---|---|---|
 | **V8.7 — Research Memory & Knowledge Management** | Retrouver les connaissances, épisodes et décisions entre sessions et providers | Sources et projets préservés, souvenirs obsolètes exclus, récupération traçable et bornée ; voir [le guide](V8_7_RESEARCH_MEMORY.md) |
-| **V8.8 — Scientific Paper Writer (renumérotée)** | Générer un manuscrit scientifique structuré et révisable | Affirmations liées aux sources/artefacts ; limites et absence de données réelles explicitement indiquées |
-| **V8.9 — End-to-End Integration & Evaluation (proposée)** | Relier toutes les briques et mesurer autonomie, coûts, fiabilité, reprises et qualité | Tests négatifs et scénarios reproductibles, sans dépendance obligatoire à HPC |
+| **V8.8 — Scientific Paper Writer** | Générer un manuscrit structuré et révisable | [Guide du rédacteur](V8_8_SCIENTIFIC_PAPER_WRITER.md) |
+| **V8.9 — End-to-End Integration & Evaluation** | Relier toutes les briques en mode synthétique et suivre reprises, décisions et appels | [Guide du parcours et scénarios](V8_9_RESEARCH_WORKFLOW.md) |
 | **Backend HPC réel (à planifier)** | Connecter un adaptateur Slurm/SSH au contrat `ExecutionBackend` | Validation avec les règles et accès réels de Jean Zay, tâches minimales approuvées, coûts/quotas contrôlés |
 | **V9 — Research Campaign (proposée)** | Utiliser le système pour la vraie question sur la robustesse agentique | Protocole scientifique pré-enregistré, modèles d'étude distincts des agents, réplications contrôlées, statistiques justifiées et revue humaine |
 
-La mémoire V8.7 est insérée avant la rédaction, à la suite de la revue de la
-feuille de route. V8.8, V8.9, le backend HPC et V9 restent à construire.
-L'accès Jean Zay et la sélection des modèles évalués sont encore à confirmer.
+Après V8.9, le catalogue de workloads scientifiques, les modèles de données
+pour des expériences réelles, l'évaluation avec des modèles réels et le backend
+HPC restent à construire. L'accès Jean Zay et la sélection des modèles étudiés
+restent à confirmer pour V9.
 
 ## 5. Premier message conseillé à Codex
 

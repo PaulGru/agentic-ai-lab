@@ -34,6 +34,12 @@ SQLite offline, des références aux sources, un cycle de vie versionné et une
 récupération intégrée aux agents. Voir le [guide mémoire](docs/V8_7_RESEARCH_MEMORY.md)
 et la [démonstration fictive](examples/V8_7_README.md).
 
+La V8.8 génère un manuscrit avec affirmations, bibliographie et figure
+rattachées aux artefacts vérifiés. La V8.9 relie le protocole approuvé au
+pilote simulé, au critique, à la mémoire puis au manuscrit, avec points de
+validation humaine. Voir les guides [V8.8](docs/V8_8_SCIENTIFIC_PAPER_WRITER.md)
+et [V8.9](docs/V8_9_RESEARCH_WORKFLOW.md).
+
 ## Fonctionnalités
 
 - Appels d'outils Python

@@ -194,18 +194,20 @@ class ReviewInput(Fingerprinted):
 
 class LLMRequest(Fingerprinted):
     review_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$")
-    role: Literal["critique", "revision"]
+    role: Literal["critique", "revision", "writer"]
     cycle: int = Field(ge=1, le=2)
     bundle_sha256: str = Field(pattern=HEX_SHA)
     settings: LLMSettings
     prompt: str = Field(min_length=1, max_length=131_072)
     instructions: str = Field(min_length=1, max_length=24_000)
-    prompt_version: Literal["v86-1"] = "v86-1"
+    prompt_version: Literal["v86-1", "v88-1"] = "v86-1"
 
     @model_validator(mode="after")
     def bounded_request(self):
-        if self.role == "critique" and self.cycle != 1:
-            raise ValueError("Only one critic call is allowed per review")
+        if self.role in {"critique", "writer"} and self.cycle != 1:
+            raise ValueError("Only one call per review is allowed for this role")
+        if (self.role == "writer") != (self.prompt_version == "v88-1"):
+            raise ValueError("Prompt version must match the LLM role")
         if len((self.prompt + self.instructions).encode("utf-8")) > 131_072:
             raise ValueError("LLM input exceeds 128 KiB")
         return self

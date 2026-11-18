@@ -88,11 +88,11 @@ Le document plus ancien `docs/ARCHITECTURE.md` décrit surtout le socle **V6.7**
 
 ## 7. Ce qui manque encore (ne pas surévaluer le projet)
 
-1. Les étapes V8.1–V8.3 et V8.4–V8.5 **ne forment pas encore une chaîne générique entièrement autonome** pour toute nouvelle recherche. Il faut formaliser la traduction sûre d'un design approuvé vers un catalogue de workloads exécutables, sans mappings scientifiques arbitraires.
+1. V8.9 relie un design approuvé au pilote arithmétique à partir de liaisons explicites. Un catalogue de workloads scientifiques et leurs contrats de traduction restent à construire.
 2. Pas de **backend Slurm réel** ni de validation des environnements, quotas, modules, transferts et politiques de Jean Zay. Le simulateur ne vaut pas preuve de compatibilité HPC.
 3. Le backend local conserve certaines limites de reprise de workers après interruption ; la gestion des soumissions incertaines est prudente, pas une garantie exactly-once.
 4. L'analyse actuelle est pédagogique : agrégats et paires synthétiques ; pas encore de modèles de données pour vraies répétitions multi-factorielles ni de protocole statistique ACL.
-5. Le **Scientific Critic & Revision** (V8.6) est implémenté sur une branche dédiée, non encore fusionnée dans le `main` de référence ; voir la section suivante. Une mémoire de recherche V8.7 est ajoutée avant le **Scientific Paper Writer**, renuméroté V8.8 et encore à construire.
+5. Le critique V8.6, la mémoire V8.7 et le rédacteur V8.8 sont réunis dans le pilote V8.9. Leur évaluation scientifique avec des modèles et des sources réels relève des travaux suivants.
 6. La CI de la PR #3 a été verte pour les tests présents dans le workflow ; cela **ne constitue pas** une validation d'accès Jean Zay, ni de campagne scientifique réelle.
 
 ## 8. Commandes et sources de vérité
@@ -116,7 +116,11 @@ La CI actuelle est `.github/workflows/v54-ci.yml` (tests sous Docker + smoke HTT
 
 ## 9. Suite
 
-**V8.6** : critique scientifique méthodologique et révision traçable. **V8.7** : mémoire de recherche inter-sessions. **V8.8** : rédaction d'un manuscrit appuyé sur des sources et données vérifiées. Une **V8.9 d'intégration** et une **V9 de recherche expérimentale réelle** sont envisagées, pas encore livrées. Voir `docs/ROADMAP.md`.
+Le [parcours V8.9](V8_9_RESEARCH_WORKFLOW.md) relie le critique V8.6, la mémoire
+V8.7 et le [rédacteur V8.8](V8_8_SCIENTIFIC_PAPER_WRITER.md). Le pilote démarre
+depuis les artefacts de conception approuvés. Après validation du manuscrit,
+il exporte les sources du pilote, les résultats et les décisions pour examen.
+La préparation de la campagne expérimentale V9 figure dans la [feuille de route](ROADMAP.md).
 
 ## 10. Branche V8.6 — critique et révision
 
@@ -135,8 +139,7 @@ n'est créé. Aucun garde-fou scientifique V8.5 n'est activé ou contourné.
 
 Le [guide V8.6](V8_6_SCIENTIFIC_CRITIC_REVISION.md) explique les sept sous-étapes,
 les exemples fictifs, le mode offline, la reprise PostgreSQL, la CI Windows et
-les limites. Cette branche ne constitue ni une campagne réelle ni une fusion
-déjà effectuée dans `main`.
+les limites. La V8.9 réutilise ce graphe dans son parcours synthétique.
 
 ## 11. Branche V8.7 — mémoire de recherche
 

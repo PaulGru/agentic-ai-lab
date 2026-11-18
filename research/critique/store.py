@@ -67,7 +67,8 @@ class ReviewStore:
 
     def put(self, kind: str, artifact_id: str, review_id: str, document: dict) -> str:
         self._write()
-        if kind not in {"session", "bundle", "review", "proposal", "decision", "approved_revision", "memory_binding", "memory_context"}:
+        if kind not in {"session", "bundle", "review", "proposal", "decision", "approved_revision",
+                        "memory_binding", "memory_context", "writer_request", "manuscript", "workflow_plan"}:
             raise ValueError("Unknown review artifact kind")
         text, digest = canonical_json(document), fingerprint(document)
         if len(text.encode("utf-8")) > 1_048_576:
@@ -119,10 +120,13 @@ class ReviewStore:
 
     def reserve_call(self, request: LLMRequest) -> dict | None:
         self._write()
-        session = ReviewInput.model_validate(self.require("session", request.review_id))
-        enabled = session.assist_critique if request.role == "critique" else session.assist_revision
-        if (not enabled or session.llm != request.settings or request.cycle > session.max_cycles
-                or fingerprint(self.require("bundle", request.review_id)) != request.bundle_sha256):
+        if request.role == "writer":
+            enabled = self.require("writer_request", request.review_id) == request.model_dump(mode="json")
+        else:
+            session = ReviewInput.model_validate(self.require("session", request.review_id))
+            enabled = (session.assist_critique if request.role == "critique" else session.assist_revision)
+            enabled = enabled and session.llm == request.settings and request.cycle <= session.max_cycles
+        if not enabled or fingerprint(self.require("bundle", request.review_id)) != request.bundle_sha256:
             raise PermissionError("Call is outside the recorded review policy/evidence")
         digest = request.fingerprint()
         with self._connect() as db:
