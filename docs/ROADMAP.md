@@ -23,6 +23,10 @@ approuvé. La prochaine validation porte sur des observations expérimentales r�
 
 ## 2. Préparer le pilote V9
 
+Le [protocole du premier pilote](V9_PILOTE_RELANCE_OUTIL.md) fixe le corpus,
+le modèle, le budget et les critères de vérification. La calibration attend
+sa validation humaine.
+
 - [ ] Définir le protocole pilote et ses critères d'acceptation avant de consulter les résultats.
 - [ ] Préparer un workload autorisé et conserver les observations par tâche.
 - [ ] Reconstruire l'analyse à partir des traces et évaluer la critique, la mémoire et les validations humaines.
