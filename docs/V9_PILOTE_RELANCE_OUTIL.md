@@ -112,7 +112,32 @@ calibration passe, demander la nouvelle empreinte avec `--phase measurement`.
 Elle lie la phase mesurée aux reçus de calibration. Les clés restent dans
 l'environnement ou le fichier `.env` local.
 
-Après exécution, le rapport reliera chaque mesure à la tâche, à la politique,
-aux événements d'outil et à la réponse. La critique, la mémoire et le manuscrit
-utiliseront un contrat de résultats V9 qui conserve la portée du pilote. Les
-formats de données synthétiques V8.5 à V8.9 restent réservés à leurs démos.
+## Reconstituer la revue et le manuscrit hors ligne
+
+```powershell
+python -m scripts.demo_v9_review --corpus examples/v9_retry_pilot.json --journal runs_control/v9_retry_pilot.sqlite3 --out-dir runs_control/v9_retry_manuscript --review-id v9-retry-pilot-001 --project v9-outil-relance
+```
+
+La commande ouvre le journal en lecture seule. Elle vérifie le corpus, le
+calendrier, les deux approbations, leur lien à la calibration et les intentions
+et reçus de chaque appel. L'analyse reconstruit les lectures et le score depuis
+les réponses brutes, puis compare les politiques par tâche. Une phase incomplète
+ou une réponse incompatible avec le score enregistré bloque la rédaction.
+Les empreintes vérifient la cohérence du journal local. Elles n'authentifient pas
+la provenance des données auprès du fournisseur.
+
+V8.6 applique des règles déterministes au dossier de preuves V9. V8.7 enregistre
+les observations et limites dans le périmètre `controlled_pilot`. V8.8 génère
+le brouillon Markdown, le JSON, la figure et un manifeste d'intégrité.
+Les analyses V8.5 existantes conservent leur format.
+
+Chaque résultat du manuscrit indique un chemin dans le dossier de preuves.
+Chaque agrégat indique les identifiants correspondants dans `analysis.json`,
+et chaque ligne d'essai y conserve l'empreinte de ses événements. Les champs
+restent descriptifs. La bibliographie attend une revue des sources validée.
+
+Pour relire la version exacte, utiliser
+`python -m scripts.demo_v88 --store runs_control/v9_retry_manuscript/review.sqlite3 --review v9-retry-pilot-001 preview`.
+Cette commande affiche aussi le SHA-256. Après la décision humaine, les
+commandes `decide` puis `export` du [guide V8.8](V8_8_SCIENTIFIC_PAPER_WRITER.md)
+permettent l'export approuvé dans un dossier distinct du brouillon.

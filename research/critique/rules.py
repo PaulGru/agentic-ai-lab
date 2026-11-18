@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import math
 
-from execution.job_manager import DurableJobManager
+from analysis.retry_pilot import RetryPilotAnalysis
 from research.critique.contracts import (
-    ClaimAssessment, CriticSuggestions, CritiqueIssue, EvidenceBundle, ReviewReport,
+    ClaimAssessment, CriticSuggestions, CritiqueIssue, EvidenceBundle, PILOT_CONCLUSION, ReviewReport,
 )
-from research.critique.evidence import resolve_ref, verify_evidence
+from research.critique.evidence import EvidenceLedger, resolve_ref, verify_evidence
 
 
 def _review(bundle: EvidenceBundle) -> ReviewReport:
@@ -19,14 +19,28 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
             basis="verified_check", finding=finding, recommendation=recommendation,
             evidence_refs=refs, requires_human_review=human))
 
-    issue("engineering_scope", "scope", "major",
-          "Les sources actuelles sont synthétiques ; elles ne justifient aucune conclusion scientifique.",
-          "Préserver cette limite et définir une véritable campagne avant toute généralisation.",
-          ["/scientific_evidence", "/analysis/validity/ready_for_scientific_inference"])
     observation_refs = []
-    for group in sorted(bundle.analysis.descriptive.groups):
-        safe_group = group.replace("~", "~0").replace("/", "~1")
-        observation_refs.append(f"/analysis/descriptive/groups/{safe_group}")
+    retry_pilot = isinstance(bundle.analysis, RetryPilotAnalysis)
+    if retry_pilot:
+        for index, code in enumerate(("pilot_sample", "fault_profile", "descriptive_scope")):
+            recommendations = (
+                "Élargir le corpus et répéter les essais sur plusieurs versions de modèles.",
+                "Ajouter un profil de panne persistante et mesurer les tentatives inutiles.",
+                "Fixer le plan d'analyse de la future campagne avant d'examiner ses données.",
+            )
+            issue(code, "methodology", "major", bundle.analysis.limitations[index], recommendations[index],
+                  [f"/analysis/limitations/{index}"], True)
+        for profile in ("clean", "transient"):
+            for policy in ("no_retry", "retry_once"):
+                observation_refs.append(f"/analysis/comparison/{profile}/arms/{policy}")
+    else:
+        issue("engineering_scope", "scope", "major",
+              "Les sources actuelles sont synthétiques ; elles ne justifient aucune conclusion scientifique.",
+              "Préserver cette limite et définir une véritable campagne avant toute généralisation.",
+              ["/scientific_evidence", "/analysis/validity/ready_for_scientific_inference"])
+        for group in sorted(bundle.analysis.descriptive.groups):
+            safe_group = group.replace("~", "~0").replace("/", "~1")
+            observation_refs.append(f"/analysis/descriptive/groups/{safe_group}")
     if bundle.source_kind == "verified_pilot_aggregates":
         issue("no_replication", "statistics", "major",
               "Chaque job fournit un agrégat ; le nombre de valeurs entrées ne mesure pas la réplication indépendante.",
@@ -41,7 +55,7 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
               "Le contrat du pilote ne conserve pas un digest immuable de l'image Docker exécutée.",
               "Documenter cette limite de reproductibilité ; vérifier l'environnement avant une campagne réelle.",
               ["/source_document/schema_version"], True)
-    else:
+    elif not retry_pilot:
         issue("assumed_independence", "methodology", "major",
               "L'indépendance et la symétrie des différences ne sont pas démontrées par une fixture JSON.",
               "Justifier ces hypothèses sur un futur processus de collecte ; conserver ici le statut pédagogique.",
@@ -73,13 +87,17 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
         if claim.kind == "hypothesis":
             status, reason = "hypothesis_only", "Une hypothèse reste à tester ; elle n'est pas un résultat."
         elif claim.kind == "scientific_conclusion":
-            status, reason = "outside_scientific_scope", "Les sources V8.5 actuelles interdisent les conclusions scientifiques."
+            status = "outside_scientific_scope"
+            reason = ("Ce pilote contrôlé ne permet pas cette conclusion scientifique." if retry_pilot else
+                      "Les sources V8.5 actuelles interdisent les conclusions scientifiques.")
         elif claim.claimed_value is not None and len(claim.evidence_refs) == 1:
             try:
                 actual = resolve_ref(bundle, claim.evidence_refs[0])
                 # Only source measurements / computed statistics count as observations.
                 allowed = claim.evidence_refs[0].startswith(("/analysis/descriptive/", "/analysis/inference/",
                                                             "/dataset_document/observations/", "/source_document/pairs/"))
+                if retry_pilot:
+                    allowed = claim.evidence_refs[0].startswith("/analysis/comparison/")
                 if (allowed and type(actual) in (int, float) and math.isfinite(actual)
                         and actual == claim.claimed_value):
                     status, reason = "supported_numeric", "Valeur numérique concordante ; l'interprétation du texte reste à relire."
@@ -93,10 +111,11 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
     return ReviewReport(
         bundle_sha256=bundle.fingerprint(), analysis_sha256=bundle.analysis.fingerprint(),
         observation_refs=observation_refs, hypothesis_refs=hypothesis_refs,
-        issues=issues, claim_assessments=assessments)
+        issues=issues, claim_assessments=assessments,
+        **({"conclusion": PILOT_CONCLUSION} if retry_pilot else {}))
 
 
-def deterministic_review(bundle: EvidenceBundle, manager: DurableJobManager | None = None) -> ReviewReport:
+def deterministic_review(bundle: EvidenceBundle, manager: EvidenceLedger | None = None) -> ReviewReport:
     verify_evidence(bundle, manager)
     return _review(bundle)
 
@@ -133,6 +152,6 @@ def check_report_bindings(bundle: EvidenceBundle, report: ReviewReport) -> None:
 
 
 def verify_review(bundle: EvidenceBundle, report: ReviewReport,
-                  manager: DurableJobManager | None = None) -> None:
+                  manager: EvidenceLedger | None = None) -> None:
     verify_evidence(bundle, manager)
     check_report_bindings(bundle, report)

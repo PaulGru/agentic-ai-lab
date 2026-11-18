@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from analysis.contracts import canonical_json, fingerprint
+from analysis.retry_pilot import SOURCE_KIND
 from research.critique.contracts import EvidenceBundle, ReviewReport
 from research.critique.evidence import resolve_ref
 from research.critique.rules import check_report_bindings
@@ -20,8 +21,10 @@ def render_review(bundle: EvidenceBundle, report: ReviewReport) -> str:
     def safe(value):
         return html.escape(str(value)).replace("\n", " ").replace("|", "\\|")
 
-    lines = ["# V8.6 — Critique et révision", "",
-             "**Sources synthétiques — aucune conclusion scientifique justifiée.**", "",
+    scope = ("**Pilote contrôlé — appels modèle enregistrés sur un catalogue fictif.**"
+             if bundle.source_kind == SOURCE_KIND else "**Sources synthétiques — aucune conclusion scientifique justifiée.**")
+    lines = ["# Critique du pilote V9" if bundle.source_kind == SOURCE_KIND else "# V8.6 — Critique et révision", "",
+             scope, "",
              "## Observations calculées", ""]
     for ref in report.observation_refs:
         lines.append(f"- {safe(ref)} : {safe(canonical_json(resolve_ref(bundle, ref)))}")

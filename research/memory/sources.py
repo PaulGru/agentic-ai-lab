@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from analysis.contracts import canonical_json, fingerprint
+from analysis.retry_pilot import SOURCE_KIND
 from research.critique.contracts import DesignContext, RevisionProposal, ReviewInput, ReviewReport
 from research.critique.evidence import load_input, read_document, validate_context
 from research.critique.revision import verify_revision
@@ -145,13 +146,25 @@ def project_items(source: SourceSnapshot) -> list[MemoryItem]:
             add("project_plan", "design:" + doc["mission_sha256"], "Protocole approuvé pour conception, non exécuté",
                 "/design_document/design/analysis_plan", "planning", tags=("design", "protocol", "analysis"))
     elif origin.kind == "review":
-        scope = "pedagogical" if root["bundle"]["source_kind"] == "pedagogical_paired_fixture" else "engineering"
-        for ref in root["report"]["observation_refs"]:
-            path = "/bundle" + ref
-            group = ref.rsplit("/", 1)[-1]
-            metric = root["bundle"]["source_document"].get("metric_name", "synthetic.mean")
-            add("observation", f"observation:{origin.review_id}:{group}", "Observation synthétique — " + group,
-                path, scope, tags=("observation", "synthetic", group, metric))
+        source_kind = root["bundle"]["source_kind"]
+        if source_kind == SOURCE_KIND:
+            scope = "controlled_pilot"
+            for ref in root["report"]["observation_refs"]:
+                profile, _, policy = ref.split("/")[-3:]
+                path = "/bundle" + ref
+                counts = pointer(root, path)
+                add("observation", f"observation:{origin.review_id}:{profile}:{policy}",
+                    f"Pilote de relance V9 — {profile} / {policy}", path, scope,
+                    tags=("relance", "exactitude", "outil", "pilote", profile, policy),
+                    text=f"{counts['correct']}/{counts['total']} réponses exactes (profil {profile}, politique {policy}).")
+        else:
+            scope = "pedagogical" if source_kind == "pedagogical_paired_fixture" else "engineering"
+            for ref in root["report"]["observation_refs"]:
+                path = "/bundle" + ref
+                group = ref.rsplit("/", 1)[-1]
+                metric = root["bundle"]["source_document"].get("metric_name", "synthetic.mean")
+                add("observation", f"observation:{origin.review_id}:{group}", "Observation synthétique — " + group,
+                    path, scope, tags=("observation", "synthetic", group, metric))
         for i, issue in enumerate(root["report"]["issues"]):
             verification = "source_checked" if issue["origin"] == "deterministic" else "unverified_model_opinion"
             add("lesson", f"issue:{origin.review_id}:{issue['issue_id']}", issue["issue_id"], f"/report/issues/{i}",

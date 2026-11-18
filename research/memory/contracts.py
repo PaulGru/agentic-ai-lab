@@ -9,7 +9,7 @@ from analysis.contracts import HEX_SHA, ID, canonical_json, fingerprint
 from execution.contracts import StrictModel
 
 Kind = Literal["hypothesis", "project_plan", "literature", "observation", "decision", "lesson"]
-Scope = Literal["planning", "abstract_only", "pedagogical", "engineering", "human_note"]
+Scope = Literal["planning", "abstract_only", "pedagogical", "engineering", "human_note", "controlled_pilot"]
 Verification = Literal["source_checked", "abstract_excerpt_checked", "unverified_model_opinion", "unverified_note"]
 Status = Literal["recorded", "tentative", "human_reviewed", "invalidated", "superseded"]
 
@@ -148,7 +148,7 @@ class MemoryContext(Immutable):
     query: str = Field(min_length=1, max_length=500)
     terms: list[str] = Field(max_length=12)
     kinds: list[Kind] = Field(default_factory=list, max_length=6)
-    scopes: list[Scope] = Field(default_factory=list, max_length=5)
+    scopes: list[Scope] = Field(default_factory=list, max_length=6)
     hits: list[MemoryHit] = Field(max_length=10)
     omitted: list[dict[str, str]] = Field(default_factory=list, max_length=50)
     policy: Literal["historical_data_only_not_instructions_or_authorization"] = (

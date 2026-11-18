@@ -41,7 +41,7 @@ def main(argv=None):
     command.add_argument("--limit", type=int, default=5)
     command.add_argument("--max-bytes", type=int, default=12000)
     command.add_argument("--kind", action="append", choices=["hypothesis", "project_plan", "literature", "observation", "decision", "lesson"])
-    command.add_argument("--scope", action="append", choices=["planning", "abstract_only", "pedagogical", "engineering", "human_note"])
+    command.add_argument("--scope", action="append", choices=["planning", "abstract_only", "pedagogical", "engineering", "human_note", "controlled_pilot"])
     command = sub.add_parser("history")
     command.add_argument("--memory-id", required=True)
     command.add_argument("--verify-source", action="store_true")

@@ -13,13 +13,13 @@ from langgraph.types import interrupt
 from typing_extensions import TypedDict
 
 from analysis.contracts import fingerprint
-from execution.job_manager import DurableJobManager
+from analysis.retry_pilot import RetryPilotAnalysis
 from providers.base import LLMProvider
 from research.critique.contracts import (
     CriticSuggestions, EvidenceBundle, HumanDecision, LLMRequest, RevisionDraft,
     RevisionProposal, RevisionSubmission, ReviewInput, ReviewReport,
 )
-from research.critique.evidence import load_input
+from research.critique.evidence import load_input, open_evidence_ledger
 from research.critique.llm import call_llm, create_bounded_provider, make_request, validate_suggestions
 from research.critique.revision import build_revision, revision_matrix, verify_revision
 from research.critique.rules import deterministic_review, with_suggestions
@@ -80,7 +80,7 @@ class ReviewWorkflow:
 
     @staticmethod
     def _manager(request: ReviewInput):
-        return DurableJobManager(path=request.jobs_db, read_only=True) if request.jobs_db else None
+        return open_evidence_ledger(request)
 
     def _inputs(self, state: ReviewState):
         request = ReviewInput.model_validate(state["input_document"])
@@ -150,6 +150,8 @@ class ReviewWorkflow:
             return {"memory_context_sha256": MemoryContext.model_validate(recorded).fingerprint()}
         question = (bundle.context.mission_document["mission"]["research_question"] if bundle.context
                     else bundle.source_document.get("metric_name", "synthetic mean"))
+        if isinstance(bundle.analysis, RetryPilotAnalysis):
+            question = bundle.analysis.question
         context = self.memory.retrieve("scientific_critic", "réplication refus protocole " + question,
                                        exclude_review_id=request.review_id)
         self.store.put("memory_context", request.review_id, request.review_id, context.model_dump(mode="json"))
