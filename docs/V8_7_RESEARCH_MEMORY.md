@@ -117,8 +117,8 @@ les souvenirs devenus obsolètes.
 
 La mémoire reste indépendante du provider. Elle ne rajoute ni outil d'exécution,
 ni recherche web, ni réparation LLM automatique. Les garanties scientifiques
-et HITL de V8.6 demeurent applicables. Le Paper Writer, encore à construire,
-pourra utiliser la même interface de récupération.
+et HITL de V8.6 demeurent applicables. Le [rédacteur V8.8](V8_8_SCIENTIFIC_PAPER_WRITER.md)
+conserve l'empreinte du contexte mémoire consulté lors de la revue.
 
 ## Démonstration locale SQLite
 
@@ -221,4 +221,4 @@ L'effet sur la qualité réelle des décisions LLM reste à évaluer sur des cas
 annotés par un humain, avec et sans mémoire. Les tests simulés prouvent le
 contrat de récupération et les garde-fous, pas un gain scientifique. La recherche
 sémantique, la vérification des textes intégraux, les preuves scientifiques
-réelles et le Paper Writer restent des étapes ultérieures.
+réelles restent des étapes ultérieures.

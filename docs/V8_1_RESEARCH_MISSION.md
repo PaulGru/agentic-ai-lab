@@ -16,15 +16,7 @@ Le fichier doit contenir entre 100 et 12 000 caractères. `## Hypothèses initia
 
 ## Démarrage sous Windows / PowerShell
 
-À partir de `main`, créer une branche :
-
-```powershell
-git switch main
-git pull --ff-only origin main
-git switch -c feat/v8.1-research-mission
-```
-
-Copier les fichiers du patch en conservant leur arborescence, puis (sans toucher aux volumes PostgreSQL) :
+Depuis la racine du dépôt, avec les dépendances Python et le brief local :
 
 ```powershell
 docker compose -f compose.yaml -f compose.v74.yaml up -d --build db

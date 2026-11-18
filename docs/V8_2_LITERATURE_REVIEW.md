@@ -22,11 +22,15 @@ Le service fournit des *métadonnées* bibliographiques, DOI et parfois un résu
 
 Requêtes limitées à la recherche *titre + résumé* : `search.title_and_abstract`. Le classement est celui renvoyé par OpenAlex ; il n'existe pas encore de sélection systématique avec critères d'inclusion/exclusion. Les doublons DOI / OpenAlex sont retirés. Pas de navigation vers des sites arbitraires, pas d'exécution de code généré par le LLM.
 
-L'API reste accessible à faible échelle sans clé ; pour augmenter le quota, définissez `OPENALEX_API_KEY` dans `.env` (non suivi par Git). En cas de 429, réduire le rythme / utiliser une clé ; le code échoue sans produire une revue trompeuse.
+Configurer `OPENALEX_API_KEY` dans le fichier local `.env`. En cas de HTTP
+429, le client lit les en-têtes de quota et attend si le délai demandé est
+court. Il effectue au plus deux nouvelles tentatives. Un quota épuisé ou un
+délai supérieur à cinq secondes arrête la découverte avant l'appel à l'analyste.
 
 ## Utilisation (PowerShell, à la racine du dépôt)
 
-Prérequis : patch V8.1 installé, mission approuvée et exportée, Python avec les dépendances du dépôt, PostgreSQL lancé sur le port 55432 via `compose.v74.yaml`, clés LLM dans `.env`.
+Préparer une mission V8.1 approuvée et exportée, les dépendances Python, un
+PostgreSQL local exposé sur le port 55432 et les clés du fournisseur LLM.
 
 ```powershell
 docker compose -f compose.yaml -f compose.v74.yaml up -d db
@@ -39,10 +43,18 @@ python -m scripts.demo_v82 export --thread robustness-001
 
 Changer `--thread` pour recommencer une nouvelle revue ; un thread existant ne peut être réécrit. `--max-queries` de 1 à 4 et `--per-query` de 1 à 10 peuvent être précisés à `start` pour réduire les appels.
 
+Si la recherche fournit moins de trois notices distinctes ou deux résumés,
+essayer de nouveaux termes avec `--query` (répétable) et un nouvel identifiant
+`--thread`. Ce réglage ne modifie pas la mission approuvée. Le diagnostic
+indique pour chaque requête les notices retournées, rejetées ou dédupliquées
+et les résumés utilisables. Après un échec de quota ou de corpus, conserver
+les checkpoints. La revue humaine doit examiner la pertinence et la couverture.
+
 ## Tests hors ligne
 
 ```powershell
 python -m unittest discover -s tests -p "test_v82_literature.py" -v
+python -m unittest discover -s tests -p "test_v82_openalex_rate_limit.py" -v
 python -m unittest discover -s tests -v
 ```
 

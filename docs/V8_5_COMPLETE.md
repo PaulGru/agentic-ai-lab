@@ -14,7 +14,7 @@ La V8.5 ne lance ni LLM, ni Docker, ni job Slurm. Elle exploite une campagne V8.
 
 | Étape | Module | Fonction |
 |---|---|---|
-| V8.5.1 | `analysis/contracts.py`, `analysis/ingest.py` | Ingestion vérifiée des agrégats V8.4.6 (fichiers repris à l'identique du patch précédent) |
+| V8.5.1 | `analysis/contracts.py`, `analysis/ingest.py` | Ingestion vérifiée des agrégats V8.4.6 |
 | V8.5.2 | `analysis/descriptive.py` | Moyenne, médiane, minimum, maximum, écart-type si applicable, contraste arithmétique |
 | V8.5.3 | `analysis/inference.py` | Test exact bilatéral par inversion de signes (2^n combinaisons), IC bootstrap percentile illustratif, effet standardisé apparié |
 | V8.5.4 | `analysis/validity.py`, `analysis/stat_contracts.py`, `analysis/pipeline.py` | Validations, refus de pseudo-réplication, refus des inférences hors périmètre, export avec empreinte |

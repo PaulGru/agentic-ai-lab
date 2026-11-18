@@ -24,7 +24,7 @@ Construire progressivement un assistant capable de :
 
 L'architecture conserve une abstraction multi-provider.
 
-La branche V8.6 ajoute une critique traçable des analyses V8.5 et des révisions
+La V8.6 ajoute une critique traçable des analyses V8.5 et des révisions
 prospectives du protocole avec validation humaine. Voir le
 [guide V8.6](docs/V8_6_SCIENTIFIC_CRITIC_REVISION.md) et les
 [exemples entièrement fictifs](examples/V8_6_README.md).
@@ -39,6 +39,10 @@ rattachées aux artefacts vérifiés. La V8.9 relie le protocole approuvé au
 pilote simulé, au critique, à la mémoire puis au manuscrit, avec points de
 validation humaine. Voir les guides [V8.8](docs/V8_8_SCIENTIFIC_PAPER_WRITER.md)
 et [V8.9](docs/V8_9_RESEARCH_WORKFLOW.md).
+
+Pour découvrir le parcours complet, prévisualiser le pilote depuis la racine
+du dépôt avec `python -m scripts.demo_v89 plan --input examples/v89_workflow.json`.
+Le guide V8.9 décrit ensuite le lancement hors ligne.
 
 ## Fonctionnalités
 
@@ -94,8 +98,10 @@ Tests HTTP :
 - V5 : Docker, API, persistance et sécurité
 - V6 : recherche et consolidation
 - V7 : agents mathématiques et expérimentaux
+- V8 : de la conception au manuscrit sur données synthétiques
+- V9 : pilote de recherche sur des observations réelles
 
-Le RAG est volontairement reporté.
+Voir la [feuille de route](docs/ROADMAP.md) pour l'état de chaque jalon.
 
 ## Déploiement
 
@@ -106,5 +112,6 @@ le développement actuel.
 
 ## Documentation technique
 
-- [Architecture de référence](docs/ARCHITECTURE.md)
+- [Architecture et contexte actuels](docs/PROJECT_CONTEXT.md)
+- [Architecture historique de l'API V6.7](docs/ARCHITECTURE.md)
 - [Sécurité des futures expériences Python](docs/V7_SECURITY.md)

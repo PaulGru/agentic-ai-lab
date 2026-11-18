@@ -1,6 +1,6 @@
 # Agentic AI Lab — Contexte et décisions architecturales
 
-> **Jalon vérifié le 17 novembre 2026.** Dépôt : `PaulGru/agentic-ai-lab`. Les versions V8.1 à V8.5 ont été intégrées à `main` via la **PR #3**, fusion squash `1283b2c420b2942c950164feff8872a1ea9d3d18`. La CI de la PR sur son dernier commit `e93a846` a réussi ; l'état des futures exécutions CI doit toujours être revérifié. Le dépôt est **public**.
+> **Jalon vérifié le 18 novembre 2026.** Les versions V8.1 à V8.9 sont intégrées à `main` dans le dépôt public `PaulGru/agentic-ai-lab`. La [PR #5](https://github.com/PaulGru/agentic-ai-lab/pull/5) a été fusionnée au commit `6f241fa` et sa [CI après fusion](https://github.com/PaulGru/agentic-ai-lab/actions/runs/44274086038) est verte.
 >
 > Ce document transmet le contexte métier et les décisions : **il ne constitue pas la transcription de tous les échanges ChatGPT et ne crée pas de mémoire automatique dans Codex**. Le code et les tests de la branche courante restent l'autorité pour le comportement réel.
 
@@ -34,7 +34,7 @@ Execution plane (indépendant du fournisseur de l'agent)
 Data plane
   artefacts / reçus vérifiés -> analysis/ -> descriptif -> validité -> inférence gardée
       |                                                         |
-      +--------------------> future scientific critic / paper writer
+      +--------------------> critique V8.6 -> mémoire V8.7 -> manuscrit V8.8
 ```
 
 **Distinction centrale** : les LLM OpenAI/Anthropic qui pilotent le scientifique autonome ne sont **pas** les modèles étudiés. Dans l'étude future, les modèles Dense/MoE et différents systèmes agentiques pourront tourner sur Jean Zay. L'architecture interne Dense/MoE d'un modèle n'est pas synonyme d'architecture `single_agent`/`planner_executor` d'un système agentique.
@@ -61,7 +61,10 @@ Data plane
 | **V8.4.6** | Pilote E2E : deux jobs Docker calculent deux moyennes synthétiques, collecte vérifiée et rapport ; `execution/campaign*` |
 | **V8.5.1–V8.5.5** | Ingestion vérifiée, descriptif, test exact apparié pédagogique, bootstrap, contrôle de validité et graphe LangGraph ; `analysis/` |
 
-Le vieux **canary V8.4** sous `research/execution_contract.py`, `research/execution_graph.py`, `research/canary_runtime.py` et `scripts/demo_v84.py` a été conservé pour l'historique. Il associait des niveaux de recherche à des modèles API du chercheur : **ce n'est plus l'architecture cible**. Le développement doit privilégier `execution/` ; ne pas réintroduire les placeholders `__SET__` du fichier local `v84_bindings.json`.
+Le premier prototype V8.4 associait des niveaux de recherche aux modèles API
+utilisés par le scientifique autonome. Le moteur générique `execution/` le
+remplace. Son code et ses anciennes consignes restent consultables à
+[la révision V8.9 antérieure au nettoyage](https://github.com/PaulGru/agentic-ai-lab/blob/6f241fa05f5f48da3fcf1ba5a6a632153a79076d/docs/V8_4_AUTONOMOUS_EXPERIMENTATION.md).
 
 ## 5. Où se trouvent les responsabilités
 

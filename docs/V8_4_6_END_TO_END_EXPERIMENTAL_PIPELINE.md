@@ -71,17 +71,6 @@ Démarrer la base :
 docker compose -f compose.yaml -f compose.v74.yaml up -d db
 ```
 
-## Installation
-
-Extraire le patch à la racine du dépôt, idéalement sur une branche dédiée,
-sans effacer les bases de données et les checkpoints des versions précédentes.
-
-```powershell
-git status
-git switch -c feat/v8.4.6-e2e-pipeline
-Expand-Archive -Path "$HOME\Downloads\agentic_ai_lab_v846_e2e_patch.zip" -DestinationPath "."
-```
-
 ## 1. Prévisualiser les jobs (aucun Docker, aucune base)
 
 ```powershell
