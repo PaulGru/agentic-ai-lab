@@ -11,6 +11,7 @@ from typing import Literal
 from pydantic import Field
 
 from analysis.contracts import HEX_SHA, canonical_json, fingerprint
+from analysis.retry_pilot import RetryPilotAnalysis
 from execution.campaign import save_report
 from execution.contracts import StrictModel
 from research.critique.contracts import Fingerprinted, HumanDecision, LLMRequest, RevisionProposal
@@ -66,7 +67,7 @@ class EditorialOrder(StrictModel):
 
 
 class Manuscript(Fingerprinted):
-    schema_version: Literal["8.8"] = "8.8"
+    schema_version: Literal["8.8", "9.0"] = "8.8"
     review_id: str
     bundle_sha256: str = Field(pattern=HEX_SHA)
     review_sha256: str = Field(pattern=HEX_SHA)
@@ -94,6 +95,24 @@ def build_manuscript(store: ReviewStore, review_id: str) -> Manuscript:
         statements.append(Statement(statement_id=f"S{len(statements) + 1:03}", section=section,
                                     text=text, reference=_ref(artifact, docs[artifact], path)))
 
+    if isinstance(bundle.analysis, RetryPilotAnalysis):
+        _retry_pilot_content(bundle.analysis, docs["bundle"], statement, figure)
+        if bundle.source_document.get("kind") == "brief_retry_study":
+            protocol = bundle.source_document["protocol"]
+            statement("introduction", "/source_document/protocol/requested_question",
+                      "Question du brief : " + protocol["requested_question"])
+            statement("methods", "/source_document/protocol/scope", protocol["scope"])
+            _bibliography_content(bundle.source_document["literature"], "/source_document/literature",
+                                  docs["bundle"], statement, bibliography)
+        for index, issue in enumerate(review.issues):
+            statement("limitations", f"/issues/{index}", issue.finding + " " + issue.recommendation, "review")
+        statement("conclusion", "/conclusion", review.conclusion, "review")
+        memory = workflow._memory_snapshot(review_id)
+        return Manuscript(schema_version="9.0", review_id=review_id, bundle_sha256=bundle.fingerprint(),
+                          review_sha256=review.fingerprint(), analysis_sha256=bundle.analysis.fingerprint(),
+                          memory_context_sha256=fingerprint(memory) if memory is not None else None,
+                          statements=statements, bibliography=bibliography, figure=figure)
+
     if bundle.context:
         root = "/context/mission_document/mission"
         statement("introduction", root + "/research_question",
@@ -105,19 +124,7 @@ def build_manuscript(store: ReviewStore, review_id: str) -> Manuscript:
         statement("methods", path, "Objectif du protocole prévu : " + resolve_ref(bundle, path))
         root = "/context/literature_document"
         literature = bundle.context.literature_document
-        papers = {paper["work_id"]: i for i, paper in enumerate(literature["catalog"]["papers"])}
-        cited = set()
-        for i, finding in enumerate(literature["review"]["findings"]):
-            work_id = finding["work_id"]
-            path = root + f"/review/findings/{i}"
-            statement("related_work", path, f"[{work_id}] Extrait de résumé : « {finding['abstract_excerpt']} »")
-            if work_id not in cited:
-                index = papers[work_id]
-                paper = literature["catalog"]["papers"][index]
-                bibliography.append(Citation(work_id=work_id, title=paper["title"], authors=paper["authors"],
-                                             year=paper["year"], doi=paper["doi"],
-                                             reference=_ref("bundle", docs["bundle"], root + f"/catalog/papers/{index}")))
-                cited.add(work_id)
+        _bibliography_content(literature, root, docs["bundle"], statement, bibliography)
     descriptive = bundle.analysis.descriptive
     if bundle.source_kind == "verified_pilot_aggregates":
         statement("methods", "/source_document/runs",
@@ -162,6 +169,46 @@ def build_manuscript(store: ReviewStore, review_id: str) -> Manuscript:
     return Manuscript(review_id=review_id, bundle_sha256=bundle.fingerprint(), review_sha256=review.fingerprint(),
                       analysis_sha256=bundle.analysis.fingerprint(), memory_context_sha256=fingerprint(context) if context else None,
                       statements=statements, bibliography=bibliography, figure=figure)
+
+
+def _bibliography_content(literature, root, document, statement, bibliography):
+    papers = {paper["work_id"]: i for i, paper in enumerate(literature["catalog"]["papers"])}
+    for i, finding in enumerate(literature["review"]["findings"]):
+        work_id = finding["work_id"]
+        statement("related_work", root + f"/review/findings/{i}",
+                  f"[{work_id}] Extrait de résumé : « {finding['abstract_excerpt']} »")
+        index = papers[work_id]
+        paper = literature["catalog"]["papers"][index]
+        bibliography.append(Citation(work_id=work_id, title=paper["title"], authors=paper["authors"],
+                                     year=paper["year"], doi=paper["doi"],
+                                     reference=_ref("bundle", document, root + f"/catalog/papers/{index}")))
+
+
+def _retry_pilot_content(analysis, document, statement, figure):
+    statement("introduction", "/analysis/question", analysis.question)
+    statement("methods", "/analysis/model", f"Modèle étudié : {analysis.model}.")
+    statement("methods", "/analysis/task_count", f"{analysis.task_count} tâches distinctes, appariées par tâche.")
+    statement("methods", "/analysis/trial_count", f"{analysis.trial_count} essais mesurés.")
+    statement("methods", "/analysis/generation_count", f"{analysis.generation_count} générations enregistrées.")
+    for index, procedure in enumerate(analysis.procedure):
+        statement("methods", f"/analysis/procedure/{index}", procedure)
+    for profile, label in (("clean", "Outil fonctionnel"), ("transient", "Erreur transitoire injectée")):
+        comparison = analysis.comparison[profile]
+        root = f"/analysis/comparison/{profile}"
+        for policy, policy_label in (("no_retry", "sans relance"), ("retry_once", "avec une relance")):
+            arm = comparison.arms[policy]
+            path = f"{root}/arms/{policy}"
+            title = f"{label}, {policy_label}"
+            statement("results", path, f"{title} : {arm.correct}/{arm.total} réponses exactes.")
+            if arm.abstentions:
+                statement("results", path + "/abstentions", f"{title} : {arm.abstentions} abstentions.")
+            figure.append(FigureRow(group=title, mean=arm.accuracy_percent,
+                                    reference=_ref("bundle", document, path + "/accuracy_percent")))
+        statement("results", root + "/gain_points", f"{label} : écart apparié de {comparison.gain_points:+g} points.")
+    statement("results", "/analysis/comparison/transient/retry_only",
+              f"Sous erreur transitoire, {analysis.comparison['transient'].retry_only} tâches réussissent uniquement avec relance.")
+    statement("results", "/analysis/generation_cost_estimate_usd", "Coût estimé des générations mesurées aux tarifs "
+              f"standard : {analysis.generation_cost_estimate_usd} USD.")
 
 
 def make_editorial_request(store, manuscript, settings):
@@ -240,24 +287,43 @@ def verified_manuscript(store, review_id, digest):
     return actual
 
 
-def _md(value):
-    return re.sub(r"([\\`*_{}\[\]()#!|>])", r"\\\1", html.escape(" ".join(str(value).split())))
+def _md(value, *, escape_quotes=True):
+    return re.sub(r"([\\`*_{}\[\]()#!|>])", r"\\\1", html.escape(" ".join(str(value).split()), quote=escape_quotes))
 
 
 def render_markdown(manuscript):
-    lines = ["# Démonstration du processus de recherche", "",
-             "**Manuscrit pédagogique — données synthétiques.**", "", "## Résumé", "",
-             "Ce document présente les étapes et résultats d'une démonstration reproductible.", ""]
+    retry_pilot = manuscript.schema_version == "9.0"
+    if retry_pilot:
+        lines = ["# Pilote V9 — Relance après une erreur d’outil", "",
+                 "**Analyse descriptive d'appels modèle sur des tâches de catalogue contrôlées.**", "", "## Résumé", "",
+                 "Le pilote compare l'exactitude des réponses avec et sans relance après une erreur de lecture.", ""]
+    else:
+        lines = ["# Démonstration du processus de recherche", "",
+                 "**Manuscrit pédagogique — données synthétiques.**", "", "## Résumé", "",
+                 "Ce document présente les étapes et résultats d'une démonstration reproductible.", ""]
     for section, heading in SECTIONS.items():
+        if retry_pilot and section == "related_work" and not manuscript.bibliography:
+            continue
+        if retry_pilot and section == "results":
+            heading = "Résultats du pilote"
         lines.extend([f"## {heading}", ""])
         for statement in manuscript.statements:
             if statement.section == section:
                 ref = statement.reference
-                lines.extend([f"{_md(statement.text)} ({statement.statement_id})",
+                lines.extend([f"{_md(statement.text, escape_quotes=not retry_pilot)} ({statement.statement_id})",
                               f"`{ref.artifact}{ref.pointer}`", ""])
         if section == "results":
-            lines.extend(["![Moyennes synthétiques par groupe](figure.svg)", ""])
-    lines.extend(["## Bibliographie — métadonnées du catalogue de démonstration", ""])
+            caption = "Taux de réponses exactes par condition" if retry_pilot else "Moyennes synthétiques par groupe"
+            lines.extend([f"![{caption}](figure.svg)", ""])
+    if retry_pilot:
+        lines.extend(["## Traçabilité", "",
+                      "Dans le dossier de preuves, les résultats par condition listent leurs identifiants d'essai. "
+                      "La liste des essais contient l'empreinte des événements correspondants dans le journal SQLite.", "",
+                      "## Bibliographie", "",
+                      ("Références de la revue approuvée, vérifiées au niveau des résumés."
+                       if manuscript.bibliography else "À compléter à partir d'une revue bibliographique validée."), ""])
+    else:
+        lines.extend(["## Bibliographie — métadonnées du catalogue de démonstration", ""])
     for entry in manuscript.bibliography:
         details = " · ".join(str(v) for v in (", ".join(entry.authors), entry.title, entry.year, entry.doi) if v)
         lines.append(f"- [{_md(entry.work_id)}] {_md(details)}")
@@ -266,6 +332,19 @@ def render_markdown(manuscript):
 
 def render_figure(manuscript):
     rows = manuscript.figure
+    if manuscript.schema_version == "9.0":
+        height = 70 + 42 * len(rows)
+        elements = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 {height}" role="img">',
+                    '<title>Taux de réponses exactes par condition</title>',
+                    f'<rect width="850" height="{height}" fill="white"/>',
+                    '<text x="12" y="22" font-size="16" font-family="sans-serif">Taux de réponses exactes (%)</text>']
+        for index, row in enumerate(rows):
+            y = 42 + 42 * index
+            elements.extend([f'<text x="12" y="{y + 15}" font-size="13" font-family="sans-serif">{html.escape(row.group)}</text>',
+                             f'<rect x="420" y="{y}" width="300" height="20" fill="#e5eef0"/>',
+                             f'<rect x="420" y="{y}" width="{3 * row.mean:.2f}" height="20" fill="#226b69"/>',
+                             f'<text x="735" y="{y + 15}" font-size="13" font-family="sans-serif">{row.mean:g} %</text>'])
+        return "\n".join([*elements, "</svg>", ""])
     scale = max((abs(row.mean) for row in rows), default=0) or 1
     height = 55 + 36 * len(rows)
     elements = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 {height}" role="img">',
@@ -282,33 +361,59 @@ def render_figure(manuscript):
     return "\n".join([*elements, "</svg>", ""])
 
 
-def _export_content(manuscript):
+def _export_content(manuscript, *, draft=False):
     documents = {"manuscript.json": canonical_json(manuscript.model_dump(mode="json")) + "\n",
                  "manuscript.md": render_markdown(manuscript), "figure.svg": render_figure(manuscript)}
+    if draft:
+        documents["manuscript.md"] = "**Version à relire — approbation en attente.**\n\n" + documents["manuscript.md"]
     hashes = {name: hashlib.sha256(value.encode("utf-8")).hexdigest() for name, value in documents.items()}
-    manifest = {"schema_version": "8.8", "manuscript_sha256": manuscript.fingerprint(), "files": hashes}
+    manifest = {"schema_version": manuscript.schema_version, "manuscript_sha256": manuscript.fingerprint(), "files": hashes}
+    if draft:
+        manifest["status"] = "awaiting_human_approval"
     return documents, manifest
 
 
 def verify_manuscript_export(store, review_id, digest, destination):
     manuscript = verified_manuscript(store, review_id, digest)
-    documents, manifest = _export_content(manuscript)
+    _verify_files(manuscript, destination)
+    return manuscript
+
+
+def verify_manuscript_draft(store, review_id, destination):
+    manuscript = build_manuscript(store, review_id)
+    _verify_files(manuscript, destination, draft=True)
+    return manuscript
+
+
+def _verify_files(manuscript, destination, *, draft=False):
+    documents, manifest = _export_content(manuscript, draft=draft)
     root = Path(destination)
     if json.loads((root / "manifest.json").read_text(encoding="utf-8")) != manifest:
         raise ValueError("Manuscript manifest differs from reconstructed evidence")
     for name, value in documents.items():
         if (root / name).read_bytes() != value.encode("utf-8"):
             raise ValueError(f"Manuscript export differs from verified version: {name}")
-    return manuscript
 
 
 def export_manuscript(store, review_id, digest, destination):
     manuscript = verified_manuscript(store, review_id, digest)
     documents, manifest = _export_content(manuscript)
+    path = _write_export(documents, manifest, destination)
+    verify_manuscript_export(store, review_id, digest, destination)
+    return path
+
+
+def export_manuscript_draft(store, review_id, destination):
+    manuscript = build_manuscript(store, review_id)
+    documents, manifest = _export_content(manuscript, draft=True)
+    return _write_export(documents, manifest, destination)
+
+
+def _write_export(documents, manifest, destination):
     root = Path(destination)
     manifest_path = root / "manifest.json"
-    if manifest_path.exists() and manifest_path.read_bytes() != (
-            json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n").encode():
+    if manifest_path.exists() and manifest_path.read_text(encoding="utf-8") != (
+            json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n"):
         raise FileExistsError("Manuscript manifest differs")
     for name, value in documents.items():
         if (root / name).exists() and (root / name).read_bytes() != value.encode("utf-8"):
@@ -322,5 +427,4 @@ def export_manuscript(store, review_id, digest, destination):
         if path.read_bytes() != value.encode("utf-8"):
             raise ValueError("Manuscript output checksum mismatch")
     save_report(manifest, manifest_path)
-    verify_manuscript_export(store, review_id, digest, root)
     return manifest_path

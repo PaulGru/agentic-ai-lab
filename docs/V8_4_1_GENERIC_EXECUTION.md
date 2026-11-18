@@ -54,9 +54,9 @@ or generate scientific measurements. Its collected artifacts are empty.
 
 ## Version compatibility
 
-This patch **adds files only**. It does not rename existing LangGraph nodes,
-change old checkpoint namespaces, edit `requirements.txt`, or touch the
-V8.4.0 canary (`research/execution_contract.py` etc.).
+The generic executor has its own contracts and preserves checkpoint namespaces
+of the earlier workflows. See the [project context](PROJECT_CONTEXT.md) for the
+history of the original V8.4 prototype.
 
 ## Next slices
 

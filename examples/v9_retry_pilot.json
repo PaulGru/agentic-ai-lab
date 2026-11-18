@@ -1,0 +1,24 @@
+{
+  "pilot_id": "retry-tool-v9-pilot-001",
+  "order_seed": 90217,
+  "catalog": {
+    "AX-103": {"stock": "37", "zone": "F-18"},
+    "BR-205": {"stock": "12", "zone": "A-32"},
+    "CL-307": {"stock": "64", "zone": "H-09"},
+    "DS-410": {"stock": "21", "zone": "C-47"},
+    "EM-512": {"stock": "8", "zone": "D-15"},
+    "FK-618": {"stock": "53", "zone": "B-26"},
+    "GT-722": {"stock": "19", "zone": "G-41"},
+    "HV-839": {"stock": "46", "zone": "E-11"}
+  },
+  "tasks": [
+    {"task_id": "T01", "prompt": "Quel est le stock actuel de la référence AX-103 ?", "product": "AX-103", "field": "stock"},
+    {"task_id": "T02", "prompt": "Localise BR-205 dans l’entrepôt et donne le code de zone.", "product": "BR-205", "field": "zone"},
+    {"task_id": "T03", "prompt": "Donne le nombre d’unités en inventaire pour CL-307.", "product": "CL-307", "field": "stock"},
+    {"task_id": "T04", "prompt": "Dans quelle zone est rangée la référence DS-410 ?", "product": "DS-410", "field": "zone"},
+    {"task_id": "T05", "prompt": "Consulte l’inventaire et indique combien d’articles EM-512 sont disponibles.", "product": "EM-512", "field": "stock"},
+    {"task_id": "T06", "prompt": "Quel emplacement de zone le catalogue indique-t-il pour FK-618 ?", "product": "FK-618", "field": "zone"},
+    {"task_id": "T07", "prompt": "Vérifie la quantité disponible de GT-722.", "product": "GT-722", "field": "stock"},
+    {"task_id": "T08", "prompt": "Trouve la zone d’entreposage associée à HV-839.", "product": "HV-839", "field": "zone"}
+  ]
+}

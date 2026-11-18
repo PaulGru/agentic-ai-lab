@@ -38,12 +38,6 @@ isolé comme preuve de provenance. L'empreinte SHA-256 sert à détecter une
 modification accidentelle ou incohérente ; ce n'est PAS une signature
 cryptographique qui authentifie l'auteur de données.
 
-## Ajouter le patch
-
-Extraire l'archive à la racine du dépôt après V8.4.6, sans écraser de fichier
-existant. Seules les nouvelles entrées `analysis/`, `scripts/demo_v851.py`,
-`tests/test_v851_ingestion.py` et la présente documentation sont ajoutées.
-
 ## Prérequis
 
 - Protocole `examples/v846_protocol.json` inchangé depuis la campagne approuvée.

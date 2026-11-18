@@ -6,7 +6,7 @@
 
 Construire, par incréments vérifiables, un **Autonomous AI Research Scientist** générique. Le dépôt est d'abord un laboratoire d'apprentissage, pas une étude scientifique finalisée. Expliquer **le rôle de chaque technologie avant de l'introduire**, privilégier les mécanismes simples et compréhensibles, et justifier toute nouvelle dépendance. Répondre en français, avec des explications pas à pas et des tests concrets.
 
-**État de référence :** V8.1–V8.5 fusionnées dans `main` le 17/11/2026 (PR #3). Prochaine brique : **V8.6 — Scientific Critic & Revision**. Avant toute tâche, vérifier la branche, `git status`, le code réellement présent et la CI : les documents décrivent un jalon, pas une vérité permanente.
+**État de référence.** V8.1 à V8.9 sont intégrées à `main` (PR #3 et #5). Le prochain jalon est le pilote V9. Avant toute tâche, vérifier la branche, `git status`, le code présent et la CI.
 
 ## Frontières qu'il est interdit de confondre
 
@@ -15,7 +15,7 @@ Construire, par incréments vérifiables, un **Autonomous AI Research Scientist*
 3. **Objets d'étude** : modèles ou algorithmes que la recherche évaluera plus tard, potentiellement via Slurm sur Jean Zay. Les modèles étudiés **ne sont pas** automatiquement les LLM OpenAI/Anthropic utilisés par les agents. Ne pas confondre architecture neuronale Dense/MoE, architecture agentique et stratégie d'orchestration.
 4. **Analyse des données (data plane)** : `analysis/` vérifie les reçus puis calcule des statistiques déterministes. Les LLM peuvent commenter les analyses, jamais inventer des résultats, références, valeurs-p ou mesures.
 
-**Attention au code historique :** `research/execution_contract.py`, `research/execution_graph.py`, `research/canary_runtime.py` et `scripts/demo_v84.py` sont un ancien canary V8.4 lié aux API LLM ; la **nouvelle direction** est le moteur générique `execution/`. Ne pas réactiver le mapping `v84_bindings.json` ni modifier les contrats sans revoir les tests et la provenance.
+**Exécution expérimentale.** Construire sur le moteur générique `execution/`. Le premier prototype V8.4 et son mapping local `v84_bindings.json` sont retirés du parcours courant. Toute évolution des contrats d'exécution doit revoir les tests et la provenance.
 
 ## Règles de sûreté et d'intégrité
 
@@ -65,4 +65,4 @@ Lancer les démos Docker/HITL séparément et uniquement avec approbation ; ne p
 
 ## Ce que nous ne faisons pas encore
 
-Pas de campagne réelle sur Jean Zay, pas de comparaison de modèles étudiés, pas d'article ACL ni de claim de découverte. La future question de robustesse sera traitée **après** la construction et l'évaluation de l'architecture (phase V9 envisagée). La V8.6 doit d'abord concevoir un critique scientifique traçable, qui relève les faiblesses et propose des révisions, sans réécrire silencieusement les données ni outrepasser l'HITL.
+V8.9 valide le parcours sur des tâches synthétiques. Préparer la V9 par un pilote local reproductible et un protocole approuvé. Toute campagne sur Jean Zay, tout accès externe et toute dépense conservent leurs validations humaines. Les critiques et révisions restent traçables et préservent les observations d'origine.

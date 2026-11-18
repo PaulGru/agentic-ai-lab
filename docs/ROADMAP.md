@@ -1,8 +1,8 @@
 # Agentic AI Lab — Roadmap et critères de livraison
 
-> **État au 17 novembre 2026 :** V8.1–V8.5 fusionnées dans `main` via [PR #3](https://github.com/PaulGru/agentic-ai-lab/pull/3), commit squash `1283b2c`. La CI de cette PR a réussi sur `e93a846`. Vérifier la branche locale et les nouvelles CI avant chaque intervention.
+> **État au 18 novembre 2026.** V8.1 à V8.9 intégrées à `main` via les [PR #3](https://github.com/PaulGru/agentic-ai-lab/pull/3) et [#5](https://github.com/PaulGru/agentic-ai-lab/pull/5). La [CI du commit V8.9](https://github.com/PaulGru/agentic-ai-lab/actions/runs/44274086038) a réussi.
 
-## 1. Jalon atteint : plateforme V8.5 consolidée
+## 1. Jalon atteint — parcours V8.9 intégré
 
 | Bloc | État | Nature de la validation |
 |---|---|---|
@@ -18,22 +18,29 @@
 | **V8.8 — Scientific Paper Writer** | Livré avec le parcours V8.9 | Manuscrit et figure vérifiables depuis les données et décisions |
 | **V8.9 — End-to-End Integration & Evaluation** | Livré en mode pilote synthétique | Liaison cellule → job, reprise PostgreSQL, validations humaines et bilan d'exécution |
 
-**Attention :** « fusionné » ne veut pas dire « prêt pour une recherche ACL » : la chaîne est encore partiellement composée de démonstrateurs indépendants, et aucun essai HPC réel n'a été exécuté.
+V8.9 valide le parcours sur des tâches synthétiques à partir d'un protocole
+approuvé. La prochaine validation porte sur des observations expérimentales réelles.
 
-## 2. Check-list du relais vers Codex
+## 2. Préparer le pilote V9
 
-- [x] Fusionner la V8.1–V8.5 dans `main` après CI réussie (PR #3).
-- [x] Corriger la fixture V8.1 indépendante du brief scientifique privé.
-- [x] Relire et fusionner la PR contenant les trois documents de transmission (PR #4).
-- [ ] Mettre à jour le dépôt local avec `git switch main` puis `git pull --ff-only origin main` **après** vérification de `git status`.
-- [ ] Vérifier que le dépôt local n'a ni secrets ajoutés ni modifications non enregistrées.
-- [ ] Installer/ouvrir l'extension Codex officielle dans VS Code et ouvrir **la racine de ce dépôt**.
-- [x] Confier à Codex un **audit en lecture seule** avant tout développement V8.6.
-- [ ] Comparer cet audit aux contrats réels et corriger les incohérences documentaires avant de démarrer les nouvelles fonctionnalités.
+Le [premier pilote](V9_PILOTE_RELANCE_OUTIL.md) a terminé sa calibration et sa
+mesure. Son journal a alimenté le critique, la mémoire et un manuscrit
+approuvé et vérifié localement.
+
+- [x] Définir le protocole pilote et ses critères d'acceptation avant de consulter les résultats.
+- [x] Préparer un workload autorisé et conserver les observations par tâche.
+- [x] Reconstruire l'analyse depuis les traces, appliquer la critique et indexer ses observations et limites.
+- [x] Vérifier la provenance des affirmations dans le manuscrit du pilote.
+- [x] Relire le manuscrit et consigner sa décision humaine.
+- [ ] Préparer les scénarios de panne persistante et l'évaluation comparative de la mémoire.
+
+Le [workflow depuis un brief](WORKFLOW_RECHERCHE.md) relie également les étapes
+V8.1–V8.3 au pilote V9 compatible et conserve les retours en arrière. Son
+parcours complet est testé avec des fournisseurs simulés.
 
 La mémoire conversationnelle de ChatGPT et celle de Codex ne sont pas automatiquement transférées. **Ces fichiers versionnés + les contrats et tests sont la référence durable du projet.**
 
-## 3. Prochaine étape fonctionnelle : V8.6 — Scientific Critic & Revision
+## 3. V8.6 — Scientific Critic & Revision
 
 **Pourquoi ?** Un système qui sait rédiger un rapport d'analyse sans remettre en question sa méthode peut produire des conclusions trompeuses. Le critique doit détecter les insuffisances, expliquer leur gravité et proposer des révisions vérifiables, tout en préservant l'historique.
 
@@ -67,7 +74,3 @@ Après V8.9, le catalogue de workloads scientifiques, les modèles de données
 pour des expériences réelles, l'évaluation avec des modèles réels et le backend
 HPC restent à construire. L'accès Jean Zay et la sélection des modèles étudiés
 restent à confirmer pour V9.
-
-## 5. Premier message conseillé à Codex
-
-> Lis `AGENTS.md`, `docs/PROJECT_CONTEXT.md` et `docs/ROADMAP.md`, puis inspecte le dépôt et ses tests. Fais un **audit en lecture seule** de l'architecture V8.1–V8.5, de ses limites et de la préparation à V8.6. Signale les écarts entre documentation et code, et propose un plan minimal de V8.6 avec contrats, tests et points d'approbation. **Ne modifie aucun fichier et n'exécute aucune action payante ou destructive avant mon approbation.**

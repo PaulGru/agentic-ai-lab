@@ -7,14 +7,18 @@ from typing import Any
 
 from analysis.ingest import ingest_verified_pilot
 from analysis.pipeline import build_fixture_analysis, build_verified_pilot_analysis
+from analysis.retry_pilot import RetryPilotAnalysis, SOURCE_KIND, analyze_retry_pilot
 from analysis.stat_contracts import AnalysisReport, PedagogicalPairedFixture
 from execution.campaign import PilotProtocol
 from execution.job_manager import DurableJobManager
+from experiments.retry_pilot import PilotCorpus
+from experiments.retry_pilot_runner import PilotJournal
 from research.critique.contracts import Claim, DesignContext, EvidenceBundle, ReviewInput
 from research.experimental_design import (
     ExperimentalDesign, validate_approved_literature, validate_design_against_inputs,
 )
 from research.literature import digest_json
+from research.retry_study import check_study
 
 
 def read_document(path: str | Path) -> dict[str, Any]:
@@ -76,11 +80,14 @@ def validate_context(context: DesignContext) -> ExperimentalDesign:
     return design
 
 
+EvidenceLedger = DurableJobManager | PilotJournal
+
+
 def build_evidence(source_kind: str, source_document: dict, *,
-                   manager: DurableJobManager | None = None,
+                   manager: EvidenceLedger | None = None,
                    context: DesignContext | None = None,
                    claims: list[Claim] | None = None,
-                   expected_analysis: AnalysisReport | None = None) -> EvidenceBundle:
+                   expected_analysis: AnalysisReport | RetryPilotAnalysis | None = None) -> EvidenceBundle:
     if context is not None:
         context = DesignContext.model_validate(context.model_dump(mode="json"))
         validate_context(context)
@@ -90,7 +97,7 @@ def build_evidence(source_kind: str, source_document: dict, *,
         source = fixture.model_dump(mode="json")
         report = build_fixture_analysis(fixture)
     elif source_kind == "verified_pilot_aggregates":
-        if manager is None or not manager.read_only:
+        if not isinstance(manager, DurableJobManager) or not manager.read_only:
             raise PermissionError("Critic requires an existing read-only SQLite job ledger")
         protocol = PilotProtocol.model_validate(source_document)
         source = protocol.model_dump(mode="json")
@@ -98,17 +105,28 @@ def build_evidence(source_kind: str, source_document: dict, *,
         dataset = normalized.model_dump(mode="json")
         quality = assessment.model_dump(mode="json")
         report = build_verified_pilot_analysis(protocol, manager)
+    elif source_kind == SOURCE_KIND:
+        if not isinstance(manager, PilotJournal):
+            raise PermissionError("V9 critique requires its original retry journal")
+        if source_document.get("kind") == "brief_retry_study":
+            corpus = check_study(source_document)
+            source = source_document
+        else:
+            corpus = PilotCorpus.model_validate(source_document)
+            source = corpus.model_dump(mode="json")
+        report = analyze_retry_pilot(corpus, manager)
     else:
         raise ValueError("Unsupported evidence source kind")
     if expected_analysis is not None and expected_analysis != report:
         raise ValueError("Analysis does not match recomputed source results")
     return EvidenceBundle(
+        schema_version="9.0" if source_kind == SOURCE_KIND else "8.6",
         source_kind=source_kind, source_document=source, analysis=report,
         dataset_document=dataset, quality_document=quality, context=context,
         claims=claims or [], design_execution_link="unavailable" if context else "not_applicable")
 
 
-def verify_evidence(bundle: EvidenceBundle, manager: DurableJobManager | None = None) -> None:
+def verify_evidence(bundle: EvidenceBundle, manager: EvidenceLedger | None = None) -> None:
     actual = build_evidence(bundle.source_kind, bundle.source_document,
                             manager=manager, context=bundle.context, claims=bundle.claims)
     if actual != bundle:
@@ -119,13 +137,18 @@ def load_input(request: ReviewInput) -> EvidenceBundle:
     """Read current source files on start AND after every sensitive interruption."""
     context = (DesignContext.model_validate(read_document(request.context_path))
                if request.context_path else None)
-    manager = None
-    if request.jobs_db is not None:
-        if request.jobs_db.startswith(("\\\\", "//")) or "://" in request.jobs_db:
-            raise ValueError("Only a local existing SQLite ledger is supported")
-        manager = DurableJobManager(path=request.jobs_db, read_only=True)
     return build_evidence(request.source_kind, read_document(request.source_path),
-                          manager=manager, context=context, claims=request.claims)
+                          manager=open_evidence_ledger(request), context=context, claims=request.claims)
+
+
+def open_evidence_ledger(request: ReviewInput) -> EvidenceLedger | None:
+    if request.jobs_db is None:
+        return None
+    if request.jobs_db.startswith(("\\\\", "//")) or "://" in request.jobs_db:
+        raise ValueError("Only a local existing SQLite ledger is supported")
+    if request.source_kind == SOURCE_KIND:
+        return PilotJournal(Path(request.jobs_db))
+    return DurableJobManager(path=request.jobs_db, read_only=True)
 
 
 def resolve_ref(bundle: EvidenceBundle, ref: str) -> Any:
