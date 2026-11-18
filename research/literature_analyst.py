@@ -58,7 +58,7 @@ class LiteratureAnalyst:
             registry=ToolRegistry(),
         )
 
-    def analyze(self, mission: ResearchMission, catalog: LiteratureCatalog) -> LiteratureReview:
+    def analyze(self, mission: ResearchMission, catalog: LiteratureCatalog, *, feedback: str = "") -> LiteratureReview:
         payload = {
             "mission": {
                 "title": mission.title,
@@ -68,6 +68,8 @@ class LiteratureAnalyst:
             },
             "catalog": [paper.model_dump() for paper in catalog.papers],
         }
+        if feedback:
+            payload["human_revision_request"] = feedback
         if self.memory:
             payload, self.last_memory_context = self.memory.enrich(payload, "literature_analyst", mission.research_question)
         response = self.agent.propose(json.dumps(payload, ensure_ascii=False))

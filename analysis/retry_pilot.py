@@ -29,6 +29,10 @@ PROCEDURE = (
 )
 
 
+class CalibrationFailed(ValueError):
+    """A complete and verified calibration missed the protocol criteria."""
+
+
 class TrialResult(Trial):
     score: Literal["correct", "incorrect", "abstention", "invalid_response"]
     lookup_attempts: list[Literal["ok", "transient_error", "invalid_lookup"]]
@@ -194,7 +198,7 @@ def _phase(plan, phase, events, trials, tasks, calibration_sha=None):
     return results
 
 
-def analyze_retry_pilot(corpus: PilotCorpus, journal: PilotJournal) -> RetryPilotAnalysis:
+def _journal_phases(corpus, journal):
     plan = final_plan(corpus)
     events = journal.events()
     if not events or events[0] != {"phase": "plan", "trial_id": "", "step": "plan", "document": plan}:
@@ -203,13 +207,28 @@ def analyze_retry_pilot(corpus: PilotCorpus, journal: PilotJournal) -> RetryPilo
     measurement = [event for event in events if event["phase"] == "measurement"]
     if events != [events[0], *calibration, *measurement]:
         raise ValueError("Journal phases are interleaved or unknown")
+    return plan, calibration, measurement
+
+
+def _verify_calibration(plan, calibration):
     checked = _phase(plan, "calibration", calibration, _calibration_trials(),
                      {task.task_id: (task, product) for task, product, _ in CALIBRATION})
     for row in checked:
         expected = "abstention" if row.profile == "transient" and row.policy == "no_retry" else "correct"
         if row.score != expected or row.lookup_attempts in ([], ["invalid_lookup"]):
-            raise ValueError("Calibration gate did not pass")
-    calibration_sha = fingerprint(calibration)
+            raise CalibrationFailed("Calibration gate did not pass")
+    return fingerprint(calibration)
+
+
+def verify_retry_calibration(corpus: PilotCorpus, journal: PilotJournal) -> str:
+    """Recheck the full recorded calibration before authorizing measurement."""
+    plan, calibration, _ = _journal_phases(corpus, journal)
+    return _verify_calibration(plan, calibration)
+
+
+def analyze_retry_pilot(corpus: PilotCorpus, journal: PilotJournal) -> RetryPilotAnalysis:
+    plan, calibration, measurement = _journal_phases(corpus, journal)
+    calibration_sha = _verify_calibration(plan, calibration)
     results = _phase(plan, "measurement", measurement, [Trial.model_validate(row) for row in plan["schedule"]["trials"]],
                      {task.task_id: (task, corpus.catalog[task.product]) for task in corpus.tasks}, calibration_sha)
     task_count = len(corpus.tasks)

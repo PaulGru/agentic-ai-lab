@@ -33,6 +33,11 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
         for profile in ("clean", "transient"):
             for policy in ("no_retry", "retry_once"):
                 observation_refs.append(f"/analysis/comparison/{profile}/arms/{policy}")
+        if bundle.source_document.get("kind") == "brief_retry_study":
+            issue("workflow_abstract_only", "bibliography", "minor",
+                  "La revue approuvée s'appuie sur les résumés et métadonnées du catalogue.",
+                  "Vérifier les textes intégraux avant une revendication de nouveauté.",
+                  ["/source_document/literature/verification_level"], True)
     else:
         issue("engineering_scope", "scope", "major",
               "Les sources actuelles sont synthétiques ; elles ne justifient aucune conclusion scientifique.",

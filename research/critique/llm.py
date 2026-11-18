@@ -65,7 +65,10 @@ bloc ; les dictionnaires de mêmes clés se comparent par feuilles.
 
 
 def create_bounded_provider(request: LLMRequest) -> LLMProvider:
-    settings = request.settings
+    return bounded_provider(request.settings)
+
+
+def bounded_provider(settings: LLMSettings) -> LLMProvider:
     if settings.provider == "openai":
         from providers.openai_provider import OpenAIProvider
         return OpenAIProvider(settings.model, native_web_search=False,

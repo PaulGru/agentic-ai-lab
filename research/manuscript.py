@@ -97,6 +97,13 @@ def build_manuscript(store: ReviewStore, review_id: str) -> Manuscript:
 
     if isinstance(bundle.analysis, RetryPilotAnalysis):
         _retry_pilot_content(bundle.analysis, docs["bundle"], statement, figure)
+        if bundle.source_document.get("kind") == "brief_retry_study":
+            protocol = bundle.source_document["protocol"]
+            statement("introduction", "/source_document/protocol/requested_question",
+                      "Question du brief : " + protocol["requested_question"])
+            statement("methods", "/source_document/protocol/scope", protocol["scope"])
+            _bibliography_content(bundle.source_document["literature"], "/source_document/literature",
+                                  docs["bundle"], statement, bibliography)
         for index, issue in enumerate(review.issues):
             statement("limitations", f"/issues/{index}", issue.finding + " " + issue.recommendation, "review")
         statement("conclusion", "/conclusion", review.conclusion, "review")
@@ -117,19 +124,7 @@ def build_manuscript(store: ReviewStore, review_id: str) -> Manuscript:
         statement("methods", path, "Objectif du protocole prévu : " + resolve_ref(bundle, path))
         root = "/context/literature_document"
         literature = bundle.context.literature_document
-        papers = {paper["work_id"]: i for i, paper in enumerate(literature["catalog"]["papers"])}
-        cited = set()
-        for i, finding in enumerate(literature["review"]["findings"]):
-            work_id = finding["work_id"]
-            path = root + f"/review/findings/{i}"
-            statement("related_work", path, f"[{work_id}] Extrait de résumé : « {finding['abstract_excerpt']} »")
-            if work_id not in cited:
-                index = papers[work_id]
-                paper = literature["catalog"]["papers"][index]
-                bibliography.append(Citation(work_id=work_id, title=paper["title"], authors=paper["authors"],
-                                             year=paper["year"], doi=paper["doi"],
-                                             reference=_ref("bundle", docs["bundle"], root + f"/catalog/papers/{index}")))
-                cited.add(work_id)
+        _bibliography_content(literature, root, docs["bundle"], statement, bibliography)
     descriptive = bundle.analysis.descriptive
     if bundle.source_kind == "verified_pilot_aggregates":
         statement("methods", "/source_document/runs",
@@ -174,6 +169,19 @@ def build_manuscript(store: ReviewStore, review_id: str) -> Manuscript:
     return Manuscript(review_id=review_id, bundle_sha256=bundle.fingerprint(), review_sha256=review.fingerprint(),
                       analysis_sha256=bundle.analysis.fingerprint(), memory_context_sha256=fingerprint(context) if context else None,
                       statements=statements, bibliography=bibliography, figure=figure)
+
+
+def _bibliography_content(literature, root, document, statement, bibliography):
+    papers = {paper["work_id"]: i for i, paper in enumerate(literature["catalog"]["papers"])}
+    for i, finding in enumerate(literature["review"]["findings"]):
+        work_id = finding["work_id"]
+        statement("related_work", root + f"/review/findings/{i}",
+                  f"[{work_id}] Extrait de résumé : « {finding['abstract_excerpt']} »")
+        index = papers[work_id]
+        paper = literature["catalog"]["papers"][index]
+        bibliography.append(Citation(work_id=work_id, title=paper["title"], authors=paper["authors"],
+                                     year=paper["year"], doi=paper["doi"],
+                                     reference=_ref("bundle", document, root + f"/catalog/papers/{index}")))
 
 
 def _retry_pilot_content(analysis, document, statement, figure):
@@ -294,7 +302,7 @@ def render_markdown(manuscript):
                  "**Manuscrit pédagogique — données synthétiques.**", "", "## Résumé", "",
                  "Ce document présente les étapes et résultats d'une démonstration reproductible.", ""]
     for section, heading in SECTIONS.items():
-        if retry_pilot and section == "related_work":
+        if retry_pilot and section == "related_work" and not manuscript.bibliography:
             continue
         if retry_pilot and section == "results":
             heading = "Résultats du pilote"
@@ -311,7 +319,9 @@ def render_markdown(manuscript):
         lines.extend(["## Traçabilité", "",
                       "Dans le dossier de preuves, les résultats par condition listent leurs identifiants d'essai. "
                       "La liste des essais contient l'empreinte des événements correspondants dans le journal SQLite.", "",
-                      "## Bibliographie", "", "À compléter à partir d'une revue bibliographique validée.", ""])
+                      "## Bibliographie", "",
+                      ("Références de la revue approuvée, vérifiées au niveau des résumés."
+                       if manuscript.bibliography else "À compléter à partir d'une revue bibliographique validée."), ""])
     else:
         lines.extend(["## Bibliographie — métadonnées du catalogue de démonstration", ""])
     for entry in manuscript.bibliography:
@@ -365,14 +375,24 @@ def _export_content(manuscript, *, draft=False):
 
 def verify_manuscript_export(store, review_id, digest, destination):
     manuscript = verified_manuscript(store, review_id, digest)
-    documents, manifest = _export_content(manuscript)
+    _verify_files(manuscript, destination)
+    return manuscript
+
+
+def verify_manuscript_draft(store, review_id, destination):
+    manuscript = build_manuscript(store, review_id)
+    _verify_files(manuscript, destination, draft=True)
+    return manuscript
+
+
+def _verify_files(manuscript, destination, *, draft=False):
+    documents, manifest = _export_content(manuscript, draft=draft)
     root = Path(destination)
     if json.loads((root / "manifest.json").read_text(encoding="utf-8")) != manifest:
         raise ValueError("Manuscript manifest differs from reconstructed evidence")
     for name, value in documents.items():
         if (root / name).read_bytes() != value.encode("utf-8"):
             raise ValueError(f"Manuscript export differs from verified version: {name}")
-    return manuscript
 
 
 def export_manuscript(store, review_id, digest, destination):

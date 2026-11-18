@@ -25,15 +25,16 @@ def local_path(path):
     return Path(path).resolve()
 
 
-def draft_pilot(corpus, journal, out_dir, review_id, project):
+def draft_pilot(corpus, journal, out_dir, review_id, project, *, memory_path=None):
     corpus, journal, root = (local_path(path) for path in (corpus, journal, out_dir))
-    output_stores = {(root / name).resolve() for name in ("review.sqlite3", "memory.sqlite3")}
+    memory_path = local_path(memory_path) if memory_path is not None else root / "memory.sqlite3"
+    output_stores = {(root / "review.sqlite3").resolve(), memory_path.resolve()}
     if {corpus, journal} & output_stores or len(output_stores) != 2:
         raise ValueError("The review and memory databases must be separate from the original sources")
     request = ReviewInput(review_id=review_id, source_kind=SOURCE_KIND, source_path=str(corpus), jobs_db=str(journal))
     bundle = load_input(request)  # validate before creating output stores
     store = ReviewStore(root / "review.sqlite3")
-    memory_binding = MemoryBinding(project_id=project, path=str(root / "memory.sqlite3"))
+    memory_binding = MemoryBinding(project_id=project, path=str(memory_path))
     session = open_session(memory_binding, initialize=True)
     graph = ReviewWorkflow(store, memory=session).build(InMemorySaver())
     cfg = config_for(review_id)

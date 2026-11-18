@@ -65,11 +65,14 @@ class MissionPlanner:
             registry=ToolRegistry(),
         )
 
-    def propose(self, brief_sections: dict[str, str]) -> ResearchMission:
+    def propose(self, brief_sections: dict[str, str], *, feedback: str = "") -> ResearchMission:
         payload = brief_sections
+        if feedback:
+            payload = {"brief": brief_sections, "human_revision_request": feedback}
         if self.memory:
             payload, self.last_memory_context = self.memory.enrich(
-                {"brief": brief_sections}, "mission_planner", brief_sections.get("Question", "recherche"))
+                {"brief": brief_sections, **({"human_revision_request": feedback} if feedback else {})},
+                "mission_planner", brief_sections.get("Question", "recherche"))
         response = self.agent.propose(
             json.dumps(payload, ensure_ascii=False)
         )

@@ -78,7 +78,7 @@ class ExperimentalDesignPlanner:
         )
 
     def propose(
-        self, mission: ResearchMission, review: LiteratureReview
+        self, mission: ResearchMission, review: LiteratureReview, *, feedback: str = ""
     ) -> ExperimentalDesign:
         # Feed only evidence already cited in V8.2, not the 40 unexamined works.
         evidence = [x.model_dump() for x in review.findings]
@@ -90,6 +90,8 @@ class ExperimentalDesignPlanner:
             "questions_for_v83": review.questions_for_v83,
             "coverage_limits": review.coverage_limits,
         }}
+        if feedback:
+            payload["human_revision_request"] = feedback
         if self.memory:
             payload, self.last_memory_context = self.memory.enrich(payload, "design_planner", mission.research_question)
         response = self.runner.propose(json.dumps(payload, ensure_ascii=False))

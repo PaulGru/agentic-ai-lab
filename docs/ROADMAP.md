@@ -24,15 +24,19 @@ approuvé. La prochaine validation porte sur des observations expérimentales r�
 ## 2. Préparer le pilote V9
 
 Le [premier pilote](V9_PILOTE_RELANCE_OUTIL.md) a terminé sa calibration et sa
-mesure. Le journal alimente hors ligne le critique, la mémoire et un manuscrit
-qui attend sa relecture humaine.
+mesure. Son journal a alimenté le critique, la mémoire et un manuscrit
+approuvé et vérifié localement.
 
 - [x] Définir le protocole pilote et ses critères d'acceptation avant de consulter les résultats.
 - [x] Préparer un workload autorisé et conserver les observations par tâche.
 - [x] Reconstruire l'analyse depuis les traces, appliquer la critique et indexer ses observations et limites.
 - [x] Vérifier la provenance des affirmations dans le manuscrit du pilote.
-- [ ] Relire le manuscrit et consigner sa décision humaine.
+- [x] Relire le manuscrit et consigner sa décision humaine.
 - [ ] Préparer les scénarios de panne persistante et l'évaluation comparative de la mémoire.
+
+Le [workflow depuis un brief](WORKFLOW_RECHERCHE.md) relie également les étapes
+V8.1–V8.3 au pilote V9 compatible et conserve les retours en arrière. Son
+parcours complet est testé avec des fournisseurs simulés.
 
 La mémoire conversationnelle de ChatGPT et celle de Codex ne sont pas automatiquement transférées. **Ces fichiers versionnés + les contrats et tests sont la référence durable du projet.**
 

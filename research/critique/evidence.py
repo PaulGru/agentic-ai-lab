@@ -18,6 +18,7 @@ from research.experimental_design import (
     ExperimentalDesign, validate_approved_literature, validate_design_against_inputs,
 )
 from research.literature import digest_json
+from research.retry_study import check_study
 
 
 def read_document(path: str | Path) -> dict[str, Any]:
@@ -107,8 +108,12 @@ def build_evidence(source_kind: str, source_document: dict, *,
     elif source_kind == SOURCE_KIND:
         if not isinstance(manager, PilotJournal):
             raise PermissionError("V9 critique requires its original retry journal")
-        corpus = PilotCorpus.model_validate(source_document)
-        source = corpus.model_dump(mode="json")
+        if source_document.get("kind") == "brief_retry_study":
+            corpus = check_study(source_document)
+            source = source_document
+        else:
+            corpus = PilotCorpus.model_validate(source_document)
+            source = corpus.model_dump(mode="json")
         report = analyze_retry_pilot(corpus, manager)
     else:
         raise ValueError("Unsupported evidence source kind")
