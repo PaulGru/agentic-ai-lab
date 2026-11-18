@@ -18,7 +18,7 @@ Namespace de checkpoints : `v82-literature:<thread>` ; préserve tous les ancien
 
 ## Pourquoi OpenAlex ?
 
-Le service fournit des *métadonnées* bibliographiques, DOI et parfois un résumé sous forme d'index inversé. Notre code reconstruit le résumé quand il existe. Une citation ne peut être validée que si le `work_id` appartient au corpus et si un extrait de 25 mots maximum est présent **à l'identique** dans le résumé. Cela ne valide pas l'interprétation sémantique faite par le LLM.
+Le service fournit des *métadonnées* bibliographiques, DOI et parfois un résumé sous forme d'index inversé. Notre code reconstruit le résumé quand il existe. Une citation ne peut être validée que si le `work_id` appartient au corpus et si un extrait de 25 mots maximum est présent dans le résumé **après normalisation de la casse et des espaces**. Cela ne valide pas l'interprétation sémantique faite par le LLM.
 
 Requêtes limitées à la recherche *titre + résumé* : `search.title_and_abstract`. Le classement est celui renvoyé par OpenAlex ; il n'existe pas encore de sélection systématique avec critères d'inclusion/exclusion. Les doublons DOI / OpenAlex sont retirés. Pas de navigation vers des sites arbitraires, pas d'exécution de code généré par le LLM.
 

@@ -2,7 +2,7 @@ name: Agentic AI Lab - CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/v8.6-*', 'feat/v8.7-*', 'feat/v8.9-*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -44,7 +44,22 @@ jobs:
         run: |
           docker compose exec -T api \
             python /app/scripts/smoke_v67.py
-            
+
+      - name: Verify V8.6 PostgreSQL restart across processes
+        run: |
+          docker compose exec -T api \
+            python -m scripts.check_v86_postgres
+
+      - name: Verify V8.7 PostgreSQL research memory across sessions
+        run: |
+          docker compose exec -T api \
+            python -m scripts.check_v87_memory
+
+      - name: Verify V8.9 PostgreSQL workflow across CLI processes
+        run: |
+          docker compose exec -T api \
+            python -m scripts.check_v89_postgres
+
       - name: Show logs on failure
         if: failure()
         run: docker compose logs --no-color --tail=100
@@ -52,3 +67,15 @@ jobs:
       - name: Cleanup CI containers
         if: always()
         run: docker compose down -v
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install existing project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run offline contracts, workflows and CLI tests on Windows
+        run: python -m unittest discover -s tests -v

@@ -15,6 +15,7 @@ from research.experimental_design import (
 )
 from research.factory import create_provider
 from research.literature import digest_json
+from research.memory.integration import approval_memory, checkpoint_memory, memory_decision_matches, verify_checkpoint_memory
 
 
 class DesignState(TypedDict, total=False):
@@ -25,17 +26,21 @@ class DesignState(TypedDict, total=False):
     design: dict[str, Any]
     design_sha256: str
     status: str
+    memory_context: dict[str, Any]
+    memory_binding: dict[str, Any]
 
 
 class ExperimentalDesignWorkflow:
-    def __init__(self, provider_factory: Callable[[], LLMProvider]):
+    def __init__(self, provider_factory: Callable[[], LLMProvider], *, memory=None):
         self.provider_factory = provider_factory
+        self.memory = memory
 
     def draft_node(self, state: DesignState) -> dict:
         mission, _, review = validate_approved_literature(
             state["mission_document"], state["literature_document"]
         )
-        proposal = ExperimentalDesignPlanner(self.provider_factory()).propose(mission, review)
+        planner = ExperimentalDesignPlanner(self.provider_factory(), memory=self.memory)
+        proposal = planner.propose(mission, review)
         design = proposal.model_dump()
         return {
             "mission_sha256": state["mission_document"]["mission_sha256"],
@@ -43,10 +48,11 @@ class ExperimentalDesignWorkflow:
             "design": design,
             "design_sha256": digest_json(design),
             "status": "awaiting_approval",
+            **checkpoint_memory(self.memory, planner.last_memory_context),
         }
 
-    @staticmethod
-    def approval_node(state: DesignState) -> dict:
+    def approval_node(self, state: DesignState) -> dict:
+        verify_checkpoint_memory(self.memory, state)
         # No writes or sandbox calls before the interruption.
         decision = interrupt({
             "kind": "experimental_design_approval",
@@ -54,7 +60,9 @@ class ExperimentalDesignWorkflow:
             "literature_input_sha256": state["literature_input_sha256"],
             "design_sha256": state["design_sha256"],
             "design": state["design"],
+            **approval_memory(state),
         })
+        verify_checkpoint_memory(self.memory, state)
         mission, _, review = validate_approved_literature(
             state["mission_document"], state["literature_document"]
         )
@@ -70,6 +78,7 @@ class ExperimentalDesignWorkflow:
             and digest_json(state["literature_document"]) == state["literature_input_sha256"]
             and digest_json(state["design"]) == state["design_sha256"]
             and design.model_dump() == state["design"]
+            and memory_decision_matches(state, decision)
         )
         return {"status": "approved" if accepted else "rejected"}
 
@@ -91,9 +100,9 @@ def _create_design_provider() -> LLMProvider:
     return provider
 
 
-def build_design_graph(saver, provider_factory=None):
+def build_design_graph(saver, provider_factory=None, *, memory=None):
     return ExperimentalDesignWorkflow(
-        provider_factory or _create_design_provider
+        provider_factory or _create_design_provider, memory=memory
     ).build(saver)
 
 

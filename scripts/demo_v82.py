@@ -1,6 +1,7 @@
 """V8.2 — PowerShell-friendly CLI with PostgreSQL checkpoint persistence."""
 
 import argparse
+from research.memory.integration import add_memory_options, session_from_options
 import json
 import re
 from pathlib import Path
@@ -104,6 +105,7 @@ def main():
             )
         if action == "resume":
             cmd.add_argument("--decision", required=True, choices=["approve", "reject"])
+    add_memory_options(parser)
     args = parser.parse_args()
     cfg = config_for(args.thread)
     with PostgresSaver.from_conn_string(database_url()) as saver:
@@ -113,6 +115,7 @@ def main():
             max_queries=getattr(args, "max_queries", 4),
             per_query=getattr(args, "per_query", 5),
             search_queries=getattr(args, "search_queries", None),
+            memory=session_from_options(args, read_only=args.action in {"status", "export"}),
         )
         snapshot = graph.get_state(cfg)
         if args.action == "status":
@@ -155,6 +158,7 @@ def main():
                 "mission_sha256": pending["mission_sha256"],
                 "catalog_sha256": pending["catalog_sha256"],
                 "review_sha256": pending["review_sha256"],
+                **({"memory_context_sha256": pending["memory_context_sha256"]} if "memory_context_sha256" in pending else {}),
             }), config=cfg, durability="sync")
         if args.action == "export" or args.action == "resume":
             values = graph.get_state(cfg).values

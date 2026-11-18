@@ -60,10 +60,15 @@ Toutes les clés et sous-clés du schéma JSON joint doivent être présentes.
 
 
 class ExperimentalDesignPlanner:
-    def __init__(self, provider: LLMProvider):
+    def __init__(self, provider: LLMProvider, *, memory=None):
+        from research.memory.integration import MEMORY_INSTRUCTIONS
+        self.memory = memory
+        self.last_memory_context = None
         instructions = DESIGN_INSTRUCTIONS + "\nSCHEMA JSON Pydantic:\n" + json.dumps(
             ExperimentalDesign.model_json_schema(), ensure_ascii=False
         )
+        if memory:
+            instructions += MEMORY_INSTRUCTIONS
         self.runner = AgentRunner(
             name="experimental_design_planner",
             description="Propose un protocole expérimental piloté et pré-enregistré",
@@ -85,6 +90,8 @@ class ExperimentalDesignPlanner:
             "questions_for_v83": review.questions_for_v83,
             "coverage_limits": review.coverage_limits,
         }}
+        if self.memory:
+            payload, self.last_memory_context = self.memory.enrich(payload, "design_planner", mission.research_question)
         response = self.runner.propose(json.dumps(payload, ensure_ascii=False))
         if response.tool_calls or not response.text:
             raise ValueError("Experimental design planner must return JSON without tools")

@@ -1,0 +1,12 @@
+{
+  "run_id": "v89-demo",
+  "context_path": "v86_design_context.json",
+  "bindings": {
+    "cells": [
+      {"run_id": "C001", "values": [1, 2, 3], "seed": 13},
+      {"run_id": "C002", "values": [0, 1, 2], "seed": 13},
+      {"run_id": "C003", "values": [2, 3, 4], "seed": 42},
+      {"run_id": "C004", "values": [1, 3, 5], "seed": 42}
+    ]
+  }
+}

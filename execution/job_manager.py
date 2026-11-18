@@ -51,10 +51,19 @@ class JobRecord:
 
 
 class DurableJobManager:
-    def __init__(self, backend: ExecutionBackend,
-                 path: str | Path = "runs_control/jobs.sqlite3"):
+    def __init__(self, backend: ExecutionBackend | None = None,
+                 path: str | Path = "runs_control/jobs.sqlite3", *, read_only: bool = False):
         self.backend = backend
         self.path = Path(path)
+        self.read_only = read_only
+        if read_only:
+            if not self.path.is_file():
+                raise FileNotFoundError("Existing job ledger required for read-only access")
+            with self._connect() as db:
+                db.execute("SELECT job_id FROM jobs LIMIT 0")
+            return
+        if backend is None:
+            raise ValueError("A writable job manager requires an execution backend")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as db:
             db.execute("""CREATE TABLE IF NOT EXISTS jobs (
@@ -71,7 +80,11 @@ class DurableJobManager:
 
     @contextmanager
     def _connect(self):
-        db = sqlite3.connect(self.path, timeout=10)
+        if self.read_only:
+            db = sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True, timeout=10)
+            db.execute("PRAGMA query_only=ON")
+        else:
+            db = sqlite3.connect(self.path, timeout=10)
         try:
             with db:
                 yield db
@@ -96,6 +109,7 @@ class DurableJobManager:
                          artifacts=artifacts, artifacts_sha256=row[7])
 
     def submit(self, job: ExperimentJob) -> JobRecord:
+        self._require_write()
         digest = job.fingerprint()
         exists = False
         with self._connect() as db:
@@ -128,6 +142,7 @@ class DurableJobManager:
     def _update(self, job_id: str, phase: str, message: str,
                 *, handle: JobHandle | None = None,
                 artifacts: JobArtifacts | None = None):
+        self._require_write()
         updates = ["phase=?", "message=?"]
         values: list[Any] = [phase, message[:250]]
         if handle is not None:
@@ -144,6 +159,7 @@ class DurableJobManager:
                 raise KeyError("Unknown job")
 
     def refresh(self, job_id: str) -> JobRecord:
+        self._require_write()
         record = self.get(job_id)
         if record is None:
             raise KeyError("Unknown job")
@@ -180,6 +196,7 @@ class DurableJobManager:
         return self.get(job_id)
 
     def cancel(self, job_id: str) -> JobRecord:
+        self._require_write()
         record = self.get(job_id)
         if record is None:
             raise KeyError("Unknown job")
@@ -205,3 +222,7 @@ class DurableJobManager:
         if record is None or record.phase != "succeeded" or record.artifacts is None:
             raise RuntimeError("No validated, persisted artifacts available")
         return record.artifacts
+
+    def _require_write(self) -> None:
+        if self.read_only:
+            raise PermissionError("Read-only job ledger cannot submit, refresh, cancel or update jobs")

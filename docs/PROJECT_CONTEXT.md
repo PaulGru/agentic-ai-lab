@@ -88,11 +88,11 @@ Le document plus ancien `docs/ARCHITECTURE.md` décrit surtout le socle **V6.7**
 
 ## 7. Ce qui manque encore (ne pas surévaluer le projet)
 
-1. Les étapes V8.1–V8.3 et V8.4–V8.5 **ne forment pas encore une chaîne générique entièrement autonome** pour toute nouvelle recherche. Il faut formaliser la traduction sûre d'un design approuvé vers un catalogue de workloads exécutables, sans mappings scientifiques arbitraires.
+1. V8.9 relie un design approuvé au pilote arithmétique à partir de liaisons explicites. Un catalogue de workloads scientifiques et leurs contrats de traduction restent à construire.
 2. Pas de **backend Slurm réel** ni de validation des environnements, quotas, modules, transferts et politiques de Jean Zay. Le simulateur ne vaut pas preuve de compatibilité HPC.
 3. Le backend local conserve certaines limites de reprise de workers après interruption ; la gestion des soumissions incertaines est prudente, pas une garantie exactly-once.
 4. L'analyse actuelle est pédagogique : agrégats et paires synthétiques ; pas encore de modèles de données pour vraies répétitions multi-factorielles ni de protocole statistique ACL.
-5. L'agent ne possède pas encore le **Scientific Critic & Revision** (V8.6), ni le **Scientific Paper Writer** (V8.7).
+5. Le critique V8.6, la mémoire V8.7 et le rédacteur V8.8 sont réunis dans le pilote V8.9. Leur évaluation scientifique avec des modèles et des sources réels relève des travaux suivants.
 6. La CI de la PR #3 a été verte pour les tests présents dans le workflow ; cela **ne constitue pas** une validation d'accès Jean Zay, ni de campagne scientifique réelle.
 
 ## 8. Commandes et sources de vérité
@@ -116,4 +116,50 @@ La CI actuelle est `.github/workflows/v54-ci.yml` (tests sous Docker + smoke HTT
 
 ## 9. Suite
 
-**V8.6** : critique scientifique méthodologique, observations de validité, recommandations de révision avec traçabilité et approbation humaine. **V8.7** : rédaction d'un manuscrit appuyé sur des sources et données vérifiées. Une **V8.8 d'intégration** et une **V9 de recherche expérimentale réelle** sont envisagées, pas encore livrées. Voir `docs/ROADMAP.md`.
+Le [parcours V8.9](V8_9_RESEARCH_WORKFLOW.md) relie le critique V8.6, la mémoire
+V8.7 et le [rédacteur V8.8](V8_8_SCIENTIFIC_PAPER_WRITER.md). Le pilote démarre
+depuis les artefacts de conception approuvés. Après validation du manuscrit,
+il exporte les sources du pilote, les résultats et les décisions pour examen.
+La préparation de la campagne expérimentale V9 figure dans la [feuille de route](ROADMAP.md).
+
+## 10. Branche V8.6 — critique et révision
+
+`research/critique/` ajoute un dossier de preuves reconstruit par V8.5, des
+critiques déterministes, des remarques LLM facultatives et non vérifiées
+sémantiquement, un journal SQLite distinct et un graphe `v86-critic:`.
+Les données et les versions précédentes sont conservées. Une ouverture
+explicitement en lecture seule du ledger V8.4 évite toute modification des jobs.
+
+Chaque appel LLM exige une autorisation exacte, avec limites de sortie, délai
+et retries désactivés. Une issue incertaine n'est jamais relancée automatiquement.
+Une révision du protocole V8.3 est diffée, justifiée, revalidée et soumise à un
+autre HITL. Sa version V8.6 est prospective, établie après consultation des
+résultats et toujours non exécutée. Aucun lien fictif entre design et résultats
+n'est créé. Aucun garde-fou scientifique V8.5 n'est activé ou contourné.
+
+Le [guide V8.6](V8_6_SCIENTIFIC_CRITIC_REVISION.md) explique les sept sous-étapes,
+les exemples fictifs, le mode offline, la reprise PostgreSQL, la CI Windows et
+les limites. La V8.9 réutilise ce graphe dans son parcours synthétique.
+
+## 11. Branche V8.7 — mémoire de recherche
+
+La mémoire technique des checkpoints reste attachée à un workflow ; les ledgers
+conservent les effets et décisions. `research/memory/` ajoute une mémoire de
+recherche consultable entre sessions et providers, avec PostgreSQL plein texte
+et SQLite/FTS5 offline, sans dépendance supplémentaire.
+
+Des projections déterministes de missions, littérature, designs, observations,
+critiques et décisions conservent les sources, leurs empreintes et leurs limites.
+Les notes/opinions sont tentatives jusqu'à relecture ; invalidation et remplacement
+sont explicites, versionnés et liés au projet. Aucun souvenir n'est une permission
+de dépenser ou d'exécuter, ni une preuve scientifique au jalon actuel.
+
+Les planificateurs et l'analyste bibliographique peuvent consulter cette mémoire.
+Le critique fige le contexte avant le HITL et indexe ses revues/décisions dans des
+nœuds séparés. Une source ou un souvenir sélectionné devenu invalide bloque la
+reprise avant tout nouvel appel. Les fonctions historiques restent disponibles
+sans mémoire, avec leurs contrats et namespaces existants.
+
+Voir [V8_7_RESEARCH_MEMORY.md](V8_7_RESEARCH_MEMORY.md) pour les commandes, les
+tests et les limites. La mémoire précède désormais le Paper Writer V8.8 ; sa
+qualité d'aide à la décision scientifique reste à évaluer sur de vrais cas.

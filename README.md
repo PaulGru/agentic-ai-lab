@@ -24,6 +24,22 @@ Construire progressivement un assistant capable de :
 
 L'architecture conserve une abstraction multi-provider.
 
+La branche V8.6 ajoute une critique traçable des analyses V8.5 et des révisions
+prospectives du protocole avec validation humaine. Voir le
+[guide V8.6](docs/V8_6_SCIENTIFIC_CRITIC_REVISION.md) et les
+[exemples entièrement fictifs](examples/V8_6_README.md).
+
+La V8.7 ajoute une mémoire de recherche entre sessions, avec PostgreSQL ou
+SQLite offline, des références aux sources, un cycle de vie versionné et une
+récupération intégrée aux agents. Voir le [guide mémoire](docs/V8_7_RESEARCH_MEMORY.md)
+et la [démonstration fictive](examples/V8_7_README.md).
+
+La V8.8 génère un manuscrit avec affirmations, bibliographie et figure
+rattachées aux artefacts vérifiés. La V8.9 relie le protocole approuvé au
+pilote simulé, au critique, à la mémoire puis au manuscrit, avec points de
+validation humaine. Voir les guides [V8.8](docs/V8_8_SCIENTIFIC_PAPER_WRITER.md)
+et [V8.9](docs/V8_9_RESEARCH_WORKFLOW.md).
+
 ## Fonctionnalités
 
 - Appels d'outils Python
