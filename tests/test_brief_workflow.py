@@ -12,6 +12,7 @@ from research.brief_workflow import BriefWorkflow, Decision, Revision
 from research.critique.contracts import LLMSettings
 from research.critique.evidence import read_document
 from research.literature_search import OpenAlexClient
+from scripts.research_workflow import guide
 from tests.test_v82_literature import FakeOpenAlex, WORKS, mission_data, valid_review
 from tests.test_v83_design import valid_design
 from tests.test_v9_retry_pilot_runner import ReplayClient
@@ -72,9 +73,20 @@ class BriefWorkflowTests(unittest.TestCase):
         blocked = self.approve("catalog")
         self.assertEqual(blocked["block"]["reason"], "InsufficientLiteratureError")
         self.assertIn("catalog", blocked["block"]["return_to"])
+        gate = blocked["pending"]
+        self.assertEqual(gate["kind"], "revision")
+        self.assertEqual(gate["details"]["proposal"]["stage"], "catalog")
+        self.assertIn("agent robustness", gate["details"]["proposal"]["queries"])
+        requests = len(self.catalog.urls)
         self.catalog.works = WORKS
-        self.rewind("catalog", queries=["fault recovery in tool using agents"])
         self.reopen()
+        self.assertEqual(self.flow.status()["pending"], gate)
+        next_step = self.approve("catalog")
+        self.assertEqual(len(self.catalog.urls), requests)
+        self.assertEqual(next_step["pending"]["kind"], "authorization")
+        self.assertNotEqual(next_step["pending"]["target_sha256"], gate["target_sha256"])
+        with self.assertRaises(PermissionError):
+            self.flow.approve(Decision(target_sha256=gate["target_sha256"], actor="test"))
         self.approve("catalog")
         self.approve("literature", valid_review())
         old_gate = self.flow.status()["pending"]["target_sha256"]
@@ -99,7 +111,8 @@ class BriefWorkflowTests(unittest.TestCase):
         complete = self.approve("review_manuscript")
         self.assertEqual(complete["status"], "complete")
         self.assertTrue(Path(complete["export"]).is_file())
-        self.assertEqual(len([event for event in self.flow.store.history() if event["action"] == "revise"]), 2)
+        self.assertEqual(len([event for event in self.flow.store.history()
+                              if event["action"] in {"revise", "approve_revision"}]), 2)
         published = Path(complete["export"])
         redraft = self.rewind("draft")
         self.assertEqual(redraft["stage"], "review_manuscript")
@@ -117,6 +130,8 @@ class BriefWorkflowTests(unittest.TestCase):
         self.approve("protocol", valid_design())
         blocked = self.approve("review_protocol")
         self.assertEqual(blocked["block"]["reason"], "no_compatible_executor")
+        self.assertIsNone(blocked["pending"])
+        self.assertIn("exécuteur", blocked["attention"])
         self.assertEqual(len(self.remote.calls), 0)
         self.assertEqual(self.rewind("protocol", workload="retry_catalog")["stage"], "review_protocol")
 
@@ -128,6 +143,7 @@ class BriefWorkflowTests(unittest.TestCase):
         gate = self.flow.status()["pending"]["target_sha256"]
         result = self.approve("calibration")
         self.assertTrue(result["block"]["uncertain"])
+        self.assertIsNone(result["pending"])
         self.reopen()
         with self.assertRaises(PermissionError):
             self.flow.approve(Decision(target_sha256=gate, actor="test"))
@@ -150,6 +166,37 @@ class BriefWorkflowTests(unittest.TestCase):
         self.assertEqual(next_gate["stage"], "calibration")
         self.assertFalse((self.directory / "pilot-02" / "pilot.sqlite3").exists())
         self.assertEqual(len(self.remote.calls), 8)
+
+    def test_invalid_citation_requests_a_repair_without_refetching_the_catalog(self):
+        self.start()
+        self.to_catalog()
+        self.approve("catalog")
+        invalid = valid_review()
+        invalid["findings"][0]["abstract_excerpt"] = "an invented excerpt absent from the catalog"
+        result = self.approve("literature", invalid)
+        self.assertEqual(result["block"]["reason"], "invalid_model_output")
+        self.assertEqual(result["pending"]["details"]["proposal"]["stage"], "literature")
+        requests = len(self.catalog.urls)
+        planner_calls = len(self.agent.start_calls)
+        self.reopen()
+        self.approve("literature")
+        self.assertEqual(len(self.agent.start_calls), planner_calls)
+        self.assertEqual(set(self.flow.status()["artifacts"]), {"mission", "catalog"})
+        self.approve("literature", valid_review())
+        hints = json.loads(self.agent.start_calls[-1]["prompt"])["human_revision_request"]
+        self.assertIn("passage exact du résumé", hints)
+        self.assertEqual(len(self.catalog.urls), requests)
+
+    def test_guide_stops_when_the_next_approval_is_declined(self):
+        self.start()
+        self.agent.responses.append(LLMResponse(text=json.dumps(mission_data())))
+        with (patch("scripts.research_workflow.confirm", side_effect=[True, False]) as confirm,
+              patch("dotenv.load_dotenv")):
+            status = guide(self.flow, "test")
+        self.assertEqual([call.args[0]["kind"] for call in confirm.call_args_list], ["authorization", "review"])
+        self.assertEqual(status["stage"], "review_mission")
+        self.assertEqual(len(self.agent.start_calls), 1)
+        self.assertEqual(self.catalog.urls, [])
 
     def test_recover_completed_measurement_after_checkpoint_interruption(self):
         self.start()

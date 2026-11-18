@@ -17,17 +17,33 @@ python -m scripts.research_workflow --dir $workflow status
 
 Remplacer `MODELE_DE_PLANIFICATION` par un identifiant auquel le compte a accès.
 OpenAI et Anthropic sont pris en charge pour la planification. `start` prépare
-le premier appel et ses bornes sans joindre le fournisseur. Chaque décision
-affiche la version et l'empreinte de l'action. Après examen, lancer :
+le premier appel et ses bornes sans joindre le fournisseur.
+
+```powershell
+python -m scripts.research_workflow --dir $workflow guide --actor operateur
+```
+
+Le mode guidé affiche chaque demande dans le terminal, puis attend
+`APPROVE` ou `STOP`. Il propose les actions et passe lui-même à la demande
+suivante après ton accord. `STOP` laisse la décision en attente. Relancer
+`guide` reprend au même endroit.
+
+| Demande | Moment |
+|---|---|
+| Autorisation | Avant un appel modèle, la découverte OpenAlex, la calibration ou la mesure. |
+| Validation | Après la proposition de mission, la synthèse, le protocole et le manuscrit. |
+| Retour en arrière | Quand un contrôle détecte un défaut et que le workflow dispose d'une correction concrète. |
+| Intervention | Quand il manque un exécuteur, que la calibration a échoué sans correction connue, ou qu'un appel demeure incertain. |
+
+Pour traiter une demande isolément ou automatiser l'interface, `status` expose
+la demande dans `pending`. On peut ensuite approuver son empreinte :
 
 ```powershell
 python -m scripts.research_workflow --dir $workflow approve --target-sha256 SHA_ACTION --actor operateur
 ```
 
-La commande demande `APPROVE` avant de poursuivre. Les appels modèle, la
-découverte OpenAlex, les validations de propositions, la calibration, la mesure
-et l'export final ont des décisions distinctes. Les clés restent dans
-l'environnement ou le fichier `.env` local. La mission et la littérature
+La commande demande aussi `APPROVE`. Les clés restent dans l'environnement ou
+le fichier `.env` local. La mission et la littérature
 approuvées sont exportées dans `versions/vNN`. Les essais et le manuscrit
 sont dans le dossier `pilot-NN` de leur protocole. Aucun transfert manuel
 entre étapes n'est nécessaire.
@@ -42,10 +58,15 @@ et s'arrête après sa validation en signalant le raccord qui manque.
 
 ## Corriger et reprendre
 
-`status` propose un point de retour lorsque la couverture bibliographique est
-insuffisante, la calibration échoue ou un autre blocage connu survient. À un
-point de décision, on peut aussi revenir volontairement en arrière. L'empreinte
-attendue par `revise` est `checkpoint_sha256`, affichée par `status`.
+Quand la couverture est insuffisante, le workflow essaie de proposer des
+requêtes plus courtes issues de la mission. Quand un extrait cité ne figure
+pas dans le catalogue, il propose de reprendre la synthèse en conservant les
+notices. La correction affiche sa raison et sa cible. Son approbation est
+locale. Le prochain appel éventuel demande une autorisation séparée.
+
+Tu peux aussi revenir volontairement en arrière, par exemple si une hypothèse
+est discutable malgré un format valide. L'empreinte attendue par `revise` est
+`checkpoint_sha256`, affichée par `status`.
 
 ```powershell
 python -m scripts.research_workflow --dir $workflow revise --stage catalog --reason "Élargir le vocabulaire de recherche" --query "tool failure recovery in language model agents" --target-sha256 SHA_CHECKPOINT --actor operateur

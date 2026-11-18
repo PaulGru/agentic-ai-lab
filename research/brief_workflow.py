@@ -39,6 +39,25 @@ STAGES = ("mission", "catalog", "literature", "protocol", "calibration", "measur
 ORDER = {stage: index for index, stage in enumerate(STAGES)}
 APPROVALS = {"review_mission": "mission", "review_literature": "literature", "review_protocol": "protocol",
              "review_manuscript": "draft"}
+PROMPTS = {
+    "mission": "Autoriser un appel du planificateur pour transformer le brief en mission ?",
+    "review_mission": "Approuver la question, les hypothèses et le périmètre proposés ?",
+    "catalog": "Autoriser la recherche OpenAlex avec les requêtes et les limites affichées ?",
+    "literature": "Autoriser un appel de l'analyste pour synthétiser les notices récupérées ?",
+    "review_literature": "Approuver la synthèse et les références proposées ?",
+    "protocol": "Autoriser un appel du planificateur pour proposer le protocole ?",
+    "review_protocol": "Approuver le protocole et le périmètre de l'expérience proposée ?",
+    "calibration": "Autoriser la calibration avec le budget affiché ?",
+    "measurement": "Autoriser la mesure avec le budget affiché et la calibration vérifiée ?",
+    "review_manuscript": "Approuver cette version du manuscrit pour l'export final ?",
+}
+MODEL_REPAIRS = {
+    "mission": "Reformuler une mission conforme au schéma en conservant le périmètre et les contraintes du brief.",
+    "literature": "Refaire la synthèse avec le catalogue déjà collecté. Pour chaque citation, reprendre un identifiant "
+                  "du catalogue et un passage exact du résumé correspondant.",
+    "protocol": "Revoir les hypothèses, les références et les contraintes de budget pour produire un protocole compatible "
+                "avec la mission et la synthèse approuvées.",
+}
 
 
 class Decision(StrictModel):
@@ -173,8 +192,68 @@ class BriefWorkflow:
                        "protocol_sha256": fingerprint(artifacts["protocol"]["document"])}
             del details["target_sha256"]
         gate = {"checkpoint_sha256": event["sha256"], "stage": stage, "version": state["version"],
+                "kind": "review" if stage in APPROVALS else "authorization", "prompt": PROMPTS[stage],
                 "details": details, "feedback": state["feedback"].get(APPROVALS.get(stage, stage), "")}
         return {**gate, "target_sha256": fingerprint(gate)}
+
+    def _broader_queries(self, state):
+        mission = validate_approved_mission(state["artifacts"]["mission"])
+        queries = state["queries"] or list(dict.fromkeys(mission.literature_queries))[:4]
+        tried = {query.casefold() for query in queries}
+        for event in self.store.history():
+            if event["action"] == "reserve" and event["detail"]["gate"]["stage"] == "catalog":
+                tried.update(query.casefold() for query in event["detail"]["gate"]["details"]["queries"])
+        alternatives = []
+        for query in queries:
+            words = query.split()
+            if len(words) < 3:
+                continue
+            for terms in (words[:-1], words[1:]):
+                candidate = " ".join(terms).strip(" ?.,")
+                if 5 <= len(candidate) <= 500 and candidate.casefold() not in tried:
+                    alternatives.append(candidate)
+                    tried.add(candidate.casefold())
+        return alternatives[:4]
+
+    def _revision_gate(self, event, block):
+        state = event["state"]
+        if not block or block["uncertain"] or state["status"] != "blocked" or state["version"] > MAX_REVISIONS:
+            return None
+        cause, stage = block["reason"], state["stage"]
+        if cause == "InsufficientLiteratureError" and stage == "catalog":
+            queries = self._broader_queries(state)
+            if not queries:
+                return None
+            proposal = {"stage": "catalog", "queries": queries,
+                        "reason": "Le catalogue ne contient pas assez de notices ou de résumés. "
+                                  "Essayer des requêtes plus courtes issues des termes déjà approuvés."}
+        elif cause == "invalid_model_output" and stage in MODEL_REPAIRS:
+            proposal = {"stage": stage, "reason": MODEL_REPAIRS[stage]}
+        else:
+            return None
+        gate = {
+            "kind": "revision", "stage": stage, "version": state["version"],
+            "checkpoint_sha256": event["sha256"],
+            "prompt": f"Accepter le retour proposé vers l'étape « {proposal['stage']} » ?",
+            "details": {"cause": cause, "proposal": proposal, "external_calls_authorized": 0},
+        }
+        return {**gate, "target_sha256": fingerprint(gate)}
+
+    @staticmethod
+    def _attention(block, state):
+        if not block:
+            return None
+        if block["uncertain"]:
+            return "Examiner les reçus de l'opération. La reprise peut utiliser un reçu complet déjà enregistré."
+        if state["version"] > MAX_REVISIONS:
+            return "La limite de révisions est atteinte. Examiner l'historique avant de définir une nouvelle série."
+        messages = {
+            "no_compatible_executor": "Choisir ou fournir un exécuteur compatible avec le protocole.",
+            "calibration_did_not_pass": "Examiner les essais de calibration et définir ce qui doit changer dans le protocole.",
+            "OpenAlexRateLimitError": "Vérifier le quota OpenAlex et choisir quand reprendre la recherche.",
+            "InsufficientLiteratureError": "Préciser un nouveau vocabulaire de recherche ou reprendre la question.",
+        }
+        return messages.get(block["reason"], "Examiner l'étape bloquée et les options de retour affichées.")
 
     def status(self):
         event = self._current()
@@ -188,13 +267,19 @@ class BriefWorkflow:
                      "uncertain": False}
         if state["status"] == "running":
             block = {"reason": "operation_reserved", "return_to": [], "uncertain": True}
+        if pending is None:
+            pending = self._revision_gate(event, block)
         return {"run_id": state["id"], "version": state["version"], "checkpoint_sha256": event["sha256"],
                 "status": "blocked" if block and state["status"] == "waiting" else state["status"],
                 "stage": state["stage"], "block": block,
-                "pending": pending, "artifacts": list(state["artifacts"]),
+                "pending": pending, "attention": self._attention(block, state) if pending is None else None,
+                "artifacts": list(state["artifacts"]),
                 "draft": state["artifacts"].get("draft"), "export": state.get("export")}
 
     def revise(self, revision):
+        return self._revise(revision)
+
+    def _revise(self, revision, *, approved_gate=None):
         revision = Revision.model_validate(revision.model_dump(mode="json"))
         event = self._current()
         state = event["state"]
@@ -239,7 +324,10 @@ class BriefWorkflow:
         state.pop("block", None)
         state.pop("export", None)
         state.update(version=state["version"] + 1, stage=revision.stage, status="waiting")
-        self.store.append(event["sha256"], state, action="revise", detail=revision.model_dump(mode="json"))
+        detail = revision.model_dump(mode="json")
+        if approved_gate is not None:
+            detail = {"revision": detail, "approved_gate": approved_gate}
+        self.store.append(event["sha256"], state, action="approve_revision" if approved_gate else "revise", detail=detail)
         return self._finish_local()
 
     def _publish(self, state, document, filename):
@@ -359,9 +447,12 @@ class BriefWorkflow:
     def approve(self, decision):
         decision = Decision.model_validate(decision.model_dump(mode="json"))
         event = self._current()
-        gate = self._gate(event)
+        gate = self._gate(event) or self._revision_gate(event, event["state"].get("block"))
         if gate is None or decision.target_sha256 != gate["target_sha256"] or not decision.actor.strip():
             raise PermissionError("Approval does not target the current action")
+        if gate["kind"] == "revision":
+            return self._revise(Revision(target_sha256=event["sha256"], actor=decision.actor,
+                                         **gate["details"]["proposal"]), approved_gate=gate)
         state = event["state"]
         stage = state["stage"]
         state["status"] = "running"
@@ -377,7 +468,9 @@ class BriefWorkflow:
         except Exception as error:
             uncertain = (provider.sent and not provider.received) or stage in {"calibration", "measurement"}
             back = list(reversed(STAGES[:min(ORDER.get(APPROVALS.get(stage, stage), 3), 3) + 1]))
-            self._block(state, type(error).__name__, [] if uncertain else back, uncertain=uncertain)
+            reason = ("invalid_model_output" if provider.received and stage in MODEL_REPAIRS
+                      and isinstance(error, ValueError) else type(error).__name__)
+            self._block(state, reason, [] if uncertain else back, uncertain=uncertain)
         self.store.append(reserved["sha256"], state, action="result", detail={"stage": stage})
         return self._finish_local()
 

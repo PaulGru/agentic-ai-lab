@@ -19,6 +19,33 @@ def read_brief(path):
     return body.decode("utf-8-sig")
 
 
+def confirm(gate):
+    print(json.dumps(gate, ensure_ascii=False, indent=2))
+    try:
+        return input(f"{gate['prompt']} Saisir APPROVE pour continuer ou STOP pour suspendre : ").strip() == "APPROVE"
+    except EOFError:
+        return False
+
+
+def apply_gate(workflow, gate, actor):
+    if gate["kind"] == "authorization":
+        from dotenv import load_dotenv
+        load_dotenv(ROOT / ".env")
+    return workflow.approve(Decision(actor=actor, target_sha256=gate["target_sha256"]))
+
+
+def guide(workflow, actor):
+    status = workflow.status()
+    while status["pending"]:
+        gate = status["pending"]
+        if not confirm(gate):
+            break
+        status = apply_gate(workflow, gate, actor)
+    if status.get("attention"):
+        print(status["attention"])
+    return status
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dir", required=True)
@@ -33,6 +60,8 @@ def main(argv=None):
     start.add_argument("--corpus")
     commands.add_parser("status")
     commands.add_parser("history")
+    guided = commands.add_parser("guide")
+    guided.add_argument("--actor", required=True)
     for action in ("approve", "revise", "recover"):
         command = commands.add_parser(action)
         command.add_argument("--target-sha256", required=True)
@@ -54,6 +83,8 @@ def main(argv=None):
         result = workflow.status()
     elif args.action == "history":
         result = workflow.store.history()
+    elif args.action == "guide":
+        result = guide(workflow, args.actor)
     else:
         details = {"actor": args.actor, "target_sha256": args.target_sha256}
         if args.action == "revise":
@@ -68,12 +99,9 @@ def main(argv=None):
             gate = status["pending"]
             if not gate or gate["target_sha256"] != args.target_sha256:
                 raise PermissionError("The approval does not target the displayed action")
-            print(json.dumps(gate, ensure_ascii=False, indent=2))
-            if input("Saisir APPROVE pour autoriser cette étape : ").strip() != "APPROVE":
+            if not confirm(gate):
                 raise PermissionError("Étape non autorisée")
-            from dotenv import load_dotenv
-            load_dotenv(ROOT / ".env")
-            result = workflow.approve(Decision(**details))
+            result = apply_gate(workflow, gate, args.actor)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
