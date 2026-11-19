@@ -5,7 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
-from research.brief_workflow import BriefWorkflow, Decision, Revision, ROOT
+from research.brief_workflow import BRIEF_WORKLOADS, ROOT, SYNTHETIC_STAGE, BriefWorkflow, Decision, Revision
 from research.critique.contracts import LLMSettings
 from research.critique.evidence import read_document
 from scripts.demo_v9_review import local_path
@@ -28,7 +28,7 @@ def confirm(gate):
 
 
 def apply_gate(workflow, gate, actor):
-    if gate["kind"] == "authorization":
+    if gate["kind"] == "authorization" and gate["stage"] != SYNTHETIC_STAGE:
         from dotenv import load_dotenv
         load_dotenv(ROOT / ".env")
     return workflow.approve(Decision(actor=actor, target_sha256=gate["target_sha256"]))
@@ -56,7 +56,7 @@ def main(argv=None):
     start.add_argument("--provider", required=True, choices=["openai", "anthropic"])
     start.add_argument("--model", required=True)
     start.add_argument("--max-output-tokens", type=int, default=4000)
-    start.add_argument("--workload", choices=["retry_catalog", "unmapped"])
+    start.add_argument("--workload", choices=BRIEF_WORKLOADS)
     start.add_argument("--corpus")
     commands.add_parser("status")
     commands.add_parser("history")
@@ -71,7 +71,7 @@ def main(argv=None):
             command.add_argument("--reason", required=True)
             command.add_argument("--brief")
             command.add_argument("--query", action="append")
-            command.add_argument("--workload", choices=["retry_catalog", "unmapped"])
+            command.add_argument("--workload", choices=BRIEF_WORKLOADS)
             command.add_argument("--corpus")
     args = parser.parse_args(argv)
     workflow = BriefWorkflow(local_path(args.dir))
