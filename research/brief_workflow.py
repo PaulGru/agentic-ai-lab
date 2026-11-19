@@ -10,8 +10,11 @@ from pydantic import Field
 
 from analysis.contracts import HEX_SHA, fingerprint
 from analysis.retry_pilot import CalibrationFailed, analyze_retry_pilot, verify_retry_calibration
-from execution.campaign import save_report
+from execution.backends.local import LocalDockerBackend
+from execution.campaign import CampaignBlocked, PilotProtocol, build_report, run_campaign, save_report
 from execution.contracts import StrictModel
+from execution.job_manager import DurableJobManager
+from execution.workloads import WORKLOAD_NAME as SYNTHETIC_WORKLOAD
 from experiments.retry_pilot import PilotCorpus
 from experiments.retry_pilot_runner import PhaseApproval, PilotJournal, approval_target, final_plan, run_phase
 from research.brief_workflow_store import WorkflowStore
@@ -35,7 +38,9 @@ from scripts.demo_v9_review import draft_pilot
 ROOT = Path(__file__).resolve().parents[1]
 MAX_REVISIONS = 4
 MAX_INPUT_BYTES = 131_072
-STAGES = ("mission", "catalog", "literature", "protocol", "calibration", "measurement", "draft")
+BRIEF_WORKLOADS = (WORKLOAD, SYNTHETIC_WORKLOAD, "unmapped")
+SYNTHETIC_STAGE = "synthetic_execution"
+STAGES = ("mission", "catalog", "literature", "protocol", SYNTHETIC_STAGE, "calibration", "measurement", "draft")
 ORDER = {stage: index for index, stage in enumerate(STAGES)}
 APPROVALS = {"review_mission": "mission", "review_literature": "literature", "review_protocol": "protocol",
              "review_manuscript": "draft"}
@@ -47,6 +52,7 @@ PROMPTS = {
     "review_literature": "Approuver la synthèse et les références proposées ?",
     "protocol": "Autoriser un appel du planificateur pour proposer le protocole ?",
     "review_protocol": "Approuver le protocole et le périmètre de l'expérience proposée ?",
+    SYNTHETIC_STAGE: "Autoriser ces calculs synthétiques dans Docker local avec les paramètres affichés ?",
     "calibration": "Autoriser la calibration avec le budget affiché ?",
     "measurement": "Autoriser la mesure avec le budget affiché et la calibration vérifiée ?",
     "review_manuscript": "Approuver cette version du manuscrit pour l'export final ?",
@@ -70,7 +76,7 @@ class Revision(Decision):
     reason: str = Field(min_length=1, max_length=2000)
     brief: str | None = Field(default=None, max_length=12_000)
     queries: list[str] | None = Field(default=None, min_length=1, max_length=4)
-    workload: Literal["retry_catalog", "unmapped"] | None = None
+    workload: Literal["retry_catalog", "synthetic.mean", "unmapped"] | None = None
     corpus: dict | None = None
 
 
@@ -95,12 +101,13 @@ class _OneCall:
 
 class BriefWorkflow:
     def __init__(self, directory, *, provider_factory=bounded_provider, search_factory=OpenAlexClient,
-                 experiment_client_factory=None):
+                 experiment_client_factory=None, synthetic_transport=None):
         self.root = Path(directory).resolve()
         self.store = WorkflowStore(self.root / "workflow.sqlite3")
         self.provider_factory = provider_factory
         self.search_factory = search_factory
         self.experiment_client_factory = experiment_client_factory
+        self.synthetic_transport = synthetic_transport
 
     def start(self, run_id, brief, settings, workload=None, corpus=None):
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,23}", run_id):
@@ -110,8 +117,8 @@ class BriefWorkflow:
         if workload and declared and workload != declared:
             raise ValueError("The explicit workload differs from the brief")
         selected = workload or declared or "unmapped"
-        if selected not in {WORKLOAD, "unmapped"}:
-            raise ValueError("Unknown workload. Use retry_catalog or leave the brief unmapped.")
+        if selected not in BRIEF_WORKLOADS:
+            raise ValueError("Unknown workload. Use retry_catalog, synthetic.mean or leave the brief unmapped.")
         if corpus is not None:
             if selected != WORKLOAD:
                 raise ValueError("A custom corpus requires the retry_catalog workload")
@@ -154,6 +161,51 @@ class BriefWorkflow:
                   "literature": artifacts["literature"], "protocol": scoped, "protocol_sha256": fingerprint(scoped)}
         return source, check_study(source)
 
+    def _prepare_synthetic_protocol(self, state):
+        artifacts = state["artifacts"]
+        mission, _, _ = validate_approved_literature(artifacts["mission"], artifacts["literature"])
+        template = read_document(ROOT / "examples" / "v846_protocol.json")
+        campaign = PilotProtocol.model_validate({**template, "campaign_id": f"{state['id']}-v{state['version']}"})
+        campaign.jobs()
+        return {"version": state["version"], "document": {
+            "workload": SYNTHETIC_WORKLOAD,
+            "requested_question": mission.research_question,
+            "measured_question": "Quelles sont les moyennes de deux listes définies et leur différence ?",
+            "scope": "Contrôle du moteur sur des valeurs fictives, sans inférence sur la question du brief.",
+            "mission_sha256": fingerprint(artifacts["mission"]),
+            "literature_sha256": fingerprint(artifacts["literature"]),
+            "campaign": campaign.model_dump(mode="json"),
+        }}
+
+    def _synthetic_campaign(self, state):
+        protocol = state["artifacts"]["protocol"]
+        path = self.root / "versions" / f"v{protocol['version']:02}" / "protocol.json"
+        if fingerprint(read_document(path)) != fingerprint(protocol):
+            raise ValueError("Exported synthetic protocol differs from the approved version")
+        return PilotProtocol.model_validate(protocol["document"]["campaign"])
+
+    @staticmethod
+    def _synthetic_details(state, campaign):
+        return {
+            "backend": "docker-local", "network": False, "scientific_evidence": False,
+            "protocol_sha256": fingerprint(state["artifacts"]["protocol"]),
+            "campaign_sha256": campaign.fingerprint(),
+            "jobs": [{"spec": job.model_dump(mode="json"), "sha256": job.fingerprint()} for job in campaign.jobs()],
+        }
+
+    def _synthetic_directory(self, state):
+        return self.root / f"synthetic-{state['artifacts']['protocol']['version']:02}"
+
+    def _complete_synthetic_report(self, state, campaign, approval):
+        directory = self._synthetic_directory(state)
+        manager = DurableJobManager(path=directory / "jobs.sqlite3", read_only=True)
+        report = build_report(campaign, manager)
+        report.update(brief_protocol_sha256=fingerprint(state["artifacts"]["protocol"]),
+                      execution_approval=approval)
+        path = save_report(report, directory / "report.json")
+        state["report"] = {"path": str(path), "sha256": fingerprint(report)}
+        state.update(stage="complete", status="complete")
+
     def _gate(self, event):
         state = event["state"]
         stage = state["stage"]
@@ -161,7 +213,7 @@ class BriefWorkflow:
             return None
         artifacts = state["artifacts"]
         details = {}
-        if stage == "draft" or (stage == "protocol" and state["workload"] == WORKLOAD):
+        if stage == "draft" or (stage == "protocol" and state["workload"] in {WORKLOAD, SYNTHETIC_WORKLOAD}):
             return None
         if stage in {"mission", "literature", "protocol"}:
             details.update(llm=state["llm"], max_calls=1, max_input_bytes=MAX_INPUT_BYTES)
@@ -181,6 +233,8 @@ class BriefWorkflow:
             details["proposal"] = artifacts[APPROVALS[stage]]
             if stage == "review_manuscript":
                 details["manuscript_sha256"] = self._draft_digest(state)
+        elif stage == SYNTHETIC_STAGE:
+            details = self._synthetic_details(state, self._synthetic_campaign(state))
         elif stage in {"calibration", "measurement"}:
             _, corpus = self._study(state)
             _, path, _ = self._trial_paths(state)
@@ -249,6 +303,8 @@ class BriefWorkflow:
             return "La limite de révisions est atteinte. Examiner l'historique avant de définir une nouvelle série."
         messages = {
             "no_compatible_executor": "Choisir ou fournir un exécuteur compatible avec le protocole.",
+            "synthetic_execution_failed": "Examiner le statut du job avant de proposer un nouveau protocole.",
+            "invalid_synthetic_report": "Le rapport exporté a changé ou manque. Vérifier les fichiers du pilote.",
             "calibration_did_not_pass": "Examiner les essais de calibration et définir ce qui doit changer dans le protocole.",
             "OpenAlexRateLimitError": "Vérifier le quota OpenAlex et choisir quand reprendre la recherche.",
             "InsufficientLiteratureError": "Préciser un nouveau vocabulaire de recherche ou reprendre la question.",
@@ -259,6 +315,7 @@ class BriefWorkflow:
         event = self._current()
         state = event["state"]
         block = state.get("block")
+        report = state.get("report")
         pending = None
         try:
             pending = self._gate(event)
@@ -267,14 +324,26 @@ class BriefWorkflow:
                      "uncertain": False}
         if state["status"] == "running":
             block = {"reason": "operation_reserved", "return_to": [], "uncertain": True}
+        if report:
+            try:
+                if fingerprint(read_document(report["path"])) != report["sha256"]:
+                    raise ValueError("Synthetic report digest mismatch")
+            except (OSError, ValueError):
+                report = None
+                block = {"reason": "invalid_synthetic_report", "return_to": ["protocol"], "uncertain": False}
         if pending is None:
             pending = self._revision_gate(event, block)
-        return {"run_id": state["id"], "version": state["version"], "checkpoint_sha256": event["sha256"],
-                "status": "blocked" if block and state["status"] == "waiting" else state["status"],
-                "stage": state["stage"], "block": block,
-                "pending": pending, "attention": self._attention(block, state) if pending is None else None,
-                "artifacts": list(state["artifacts"]),
-                "draft": state["artifacts"].get("draft"), "export": state.get("export")}
+        result = {
+            "run_id": state["id"], "version": state["version"], "checkpoint_sha256": event["sha256"],
+            "status": "blocked" if block and state["status"] in {"waiting", "complete"} else state["status"],
+            "stage": state["stage"], "block": block, "pending": pending,
+            "attention": self._attention(block, state) if pending is None else None,
+            "artifacts": list(state["artifacts"]),
+            "draft": state["artifacts"].get("draft"), "export": state.get("export"),
+        }
+        if state["workload"] == SYNTHETIC_WORKLOAD:
+            result["report"] = report
+        return result
 
     def revise(self, revision):
         return self._revise(revision)
@@ -290,13 +359,15 @@ class BriefWorkflow:
         current = APPROVALS.get(state["stage"], state["stage"])
         if ORDER[revision.stage] > ORDER.get(current, ORDER["draft"]):
             raise ValueError("Revision cannot skip pending stages")
+        if revision.stage == "draft" and state["workload"] == SYNTHETIC_WORKLOAD:
+            raise ValueError("The synthetic calculation has no manuscript to revise")
         if state["version"] > MAX_REVISIONS:
             raise PermissionError("Revision limit reached")
         if revision.brief is not None:
             if revision.stage != "mission":
                 raise ValueError("Brief changes require returning to the mission")
             declared = parse_brief(revision.brief).get("Exécuteur", "").strip()
-            if declared and declared not in {WORKLOAD, "unmapped"}:
+            if declared and declared not in BRIEF_WORKLOADS:
                 raise ValueError("Unknown workload in revised brief")
             state["workload"] = declared or "unmapped"
             state["retry_corpus"] = None
@@ -323,6 +394,7 @@ class BriefWorkflow:
         state["feedback"][revision.stage] = revision.reason.strip()
         state.pop("block", None)
         state.pop("export", None)
+        state.pop("report", None)
         state.update(version=state["version"] + 1, stage=revision.stage, status="waiting")
         detail = revision.model_dump(mode="json")
         if approved_gate is not None:
@@ -359,13 +431,15 @@ class BriefWorkflow:
             state["stage"] = "protocol"
         elif stage == "review_protocol":
             self._publish(state, artifacts["protocol"], "protocol.json")
-            if state["workload"] != WORKLOAD:
-                self._block(state, "no_compatible_executor", ["protocol", "literature", "catalog", "mission"])
-            else:
+            if state["workload"] == SYNTHETIC_WORKLOAD:
+                state["stage"] = SYNTHETIC_STAGE
+            elif state["workload"] == WORKLOAD:
                 source, _ = self._study(state)
                 path, _, _ = self._trial_paths(state)
                 save_report(source, path)
                 state["stage"] = "calibration"
+            else:
+                self._block(state, "no_compatible_executor", ["protocol", "literature", "catalog", "mission"])
         else:
             result = artifacts["draft"]
             _, _, paper = self._trial_paths(state)
@@ -425,6 +499,14 @@ class BriefWorkflow:
             artifacts["protocol"] = {"version": state["version"], "document": design.model_dump(),
                                      "workload": "unmapped"}
             state["stage"] = "review_protocol"
+        elif stage == SYNTHETIC_STAGE:
+            campaign = self._synthetic_campaign(state)
+            if gate["details"] != self._synthetic_details(state, campaign):
+                raise PermissionError("Synthetic campaign differs from the authorized jobs")
+            backend = LocalDockerBackend(execution_authorized=True, transport=self.synthetic_transport)
+            manager = DurableJobManager(backend, self._synthetic_directory(state) / "jobs.sqlite3")
+            run_campaign(campaign, manager)
+            self._complete_synthetic_report(state, campaign, decision.model_dump(mode="json"))
         elif stage in {"calibration", "measurement"}:
             source, corpus = self._study(state)
             source_path, journal, _ = self._trial_paths(state)
@@ -465,8 +547,15 @@ class BriefWorkflow:
         except (InsufficientLiteratureError, OpenAlexRateLimitError) as error:
             self._block(state, type(error).__name__, ["catalog", "mission"])
             state["block"]["message"] = str(error)[:1500]
+        except CampaignBlocked as error:
+            self._block(state, "synthetic_execution_failed",
+                        [] if error.uncertain else ["protocol", "literature", "catalog", "mission"],
+                        uncertain=error.uncertain)
+            state["block"]["message"] = str(error)
         except Exception as error:
-            uncertain = (provider.sent and not provider.received) or stage in {"calibration", "measurement"}
+            uncertain = (provider.sent and not provider.received) or stage in {
+                SYNTHETIC_STAGE, "calibration", "measurement",
+            }
             back = list(reversed(STAGES[:min(ORDER.get(APPROVALS.get(stage, stage), 3), 3) + 1]))
             reason = ("invalid_model_output" if provider.received and stage in MODEL_REPAIRS
                       and isinstance(error, ValueError) else type(error).__name__)
@@ -481,14 +570,18 @@ class BriefWorkflow:
             if state["status"] != "waiting":
                 break
             stage = state["stage"]
-            if stage == "protocol" and state["workload"] == WORKLOAD:
+            if stage == "protocol" and state["workload"] in {WORKLOAD, SYNTHETIC_WORKLOAD}:
                 try:
-                    template = state["retry_corpus"] or read_document(ROOT / "examples" / "v9_retry_pilot.json")
-                    corpus = PilotCorpus.model_validate(template).model_copy(
-                        update={"pilot_id": f"{state['id']}-v{state['version']}"})
                     artifacts = state["artifacts"]
-                    artifacts["protocol"] = {"version": state["version"], "corpus": corpus.model_dump(mode="json"),
-                                             "document": protocol_for(artifacts["mission"], artifacts["literature"], corpus)}
+                    if state["workload"] == SYNTHETIC_WORKLOAD:
+                        artifacts["protocol"] = self._prepare_synthetic_protocol(state)
+                    else:
+                        template = state["retry_corpus"] or read_document(ROOT / "examples" / "v9_retry_pilot.json")
+                        corpus = PilotCorpus.model_validate(template).model_copy(
+                            update={"pilot_id": f"{state['id']}-v{state['version']}"})
+                        artifacts["protocol"] = {"version": state["version"], "corpus": corpus.model_dump(mode="json"),
+                                                 "document": protocol_for(artifacts["mission"], artifacts["literature"],
+                                                                          corpus)}
                     state["stage"] = "review_protocol"
                 except (ValueError, RuntimeError, OSError, KeyError) as error:
                     self._block(state, type(error).__name__, ["protocol", "literature", "catalog", "mission"])
@@ -518,6 +611,24 @@ class BriefWorkflow:
         if decision.target_sha256 != event["sha256"] or not decision.actor.strip():
             raise PermissionError("Recovery must target the current checkpoint")
         stage = state["stage"]
+        if stage == SYNTHETIC_STAGE and (state["status"] == "running" or state.get("block", {}).get("uncertain")):
+            reservation = event
+            if event["action"] != "reserve":
+                reservation = next(item for item in self.store.history() if item["sha256"] == event["previous_sha256"])
+            reserved = reservation["detail"]
+            campaign = self._synthetic_campaign(state)
+            if (reservation["action"] != "reserve" or reserved["gate"]["stage"] != SYNTHETIC_STAGE
+                    or reserved["decision"]["target_sha256"] != reserved["gate"]["target_sha256"]
+                    or reserved["gate"]["details"] != self._synthetic_details(state, campaign)):
+                raise PermissionError("Synthetic receipts do not match the reserved operation")
+            try:
+                self._complete_synthetic_report(state, campaign, reserved["decision"])
+            except (FileNotFoundError, RuntimeError) as error:
+                raise PermissionError("No complete synthetic job receipts. Reconcile manually; no job was replayed.") from error
+            state.pop("block", None)
+            self.store.append(event["sha256"], state, action="recover_synthetic_report",
+                              detail=decision.model_dump(mode="json"))
+            return self.status()
         if stage in {"calibration", "measurement"} and state["status"] == "running":
             source, corpus = self._study(state)
             source_path, path, _ = self._trial_paths(state)
@@ -544,8 +655,8 @@ class BriefWorkflow:
                                       detail=decision.model_dump(mode="json"))
                     return self.status()
                 state["stage"] = "measurement"
-        elif (state["status"] not in {"blocked", "waiting"}
-              or not (stage == "draft" or (stage == "protocol" and state["workload"] == WORKLOAD))):
+        elif (state["status"] not in {"blocked", "waiting"} or not (
+                stage == "draft" or (stage == "protocol" and state["workload"] in {WORKLOAD, SYNTHETIC_WORKLOAD}))):
             raise PermissionError("Recovery requires a safe local step or a complete existing pilot receipt")
         state.pop("block", None)
         state["status"] = "waiting"

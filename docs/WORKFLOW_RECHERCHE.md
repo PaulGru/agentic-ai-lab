@@ -30,7 +30,7 @@ suivante après ton accord. `STOP` laisse la décision en attente. Relancer
 
 | Demande | Moment |
 |---|---|
-| Autorisation | Avant un appel modèle, la découverte OpenAlex, la calibration ou la mesure. |
+| Autorisation | Avant un appel modèle, la découverte OpenAlex, la calibration, la mesure ou une campagne Docker locale. |
 | Validation | Après la proposition de mission, la synthèse, le protocole et le manuscrit. |
 | Retour en arrière | Quand un contrôle détecte un défaut et que le workflow dispose d'une correction concrète. |
 | Intervention | Quand il manque un exécuteur, que la calibration a échoué sans correction connue, ou qu'un appel demeure incertain. |
@@ -55,6 +55,36 @@ utilise le runner V9, un catalogue compatible et son modèle expérimental,
 distinct du modèle de planification. Un corpus compatible peut être donné
 avec `--corpus`. Pour un brief sans exécuteur, la chaîne prépare un plan V8.3
 et s'arrête après sa validation en signalant le raccord qui manque.
+
+## Tester le moteur avec des valeurs synthétiques
+
+Choisir `--workload synthetic.mean` à la place de `retry_catalog`, ou déclarer
+`synthetic.mean` dans la section `## Exécuteur` du brief. Si le brief déclare
+déjà un autre exécuteur, utiliser un nouveau brief ou revenir au protocole
+avec `revise --stage protocol --workload synthetic.mean`. L'image Docker locale
+`agentic-lab-sandbox:v7.2` doit déjà être disponible.
+
+```powershell
+$workflow = "runs_control/pilote-synthetique"
+python -m scripts.research_workflow --dir $workflow start --id pilote-synthetique --brief tests/fixtures/research_brief.md --provider openai --model MODELE_DE_PLANIFICATION --workload synthetic.mean
+python -m scripts.research_workflow --dir $workflow guide --actor operateur
+```
+
+Le protocole reprend les deux listes et les limites de ressources de
+[`examples/v846_protocol.json`](../examples/v846_protocol.json). Il affiche
+aussi la question demandée et le calcul effectivement réalisé. Après la revue
+du protocole, `guide` demande une autorisation Docker séparée qui montre les
+valeurs, la graine, les ressources et l'empreinte de chaque job. Le moteur
+réutilise son programme autorisé et vérifie les métriques d'après les entrées,
+même après une sortie normale du conteneur.
+
+Le parcours se termine sur un rapport d'intégration `synthetic-NN/report.json`.
+Le rapport lie le protocole et son autorisation aux jobs et aux reçus SQLite.
+`status` affiche son chemin et vérifie son empreinte. En cas d'interruption,
+`recover` peut rattacher les résultats si tous les reçus sont déjà vérifiables.
+Les moyennes sont des observations sur les listes fictives du pilote
+(`scientific_evidence: false`). La préparation en amont conserve les
+autorisations habituelles pour les appels au planificateur et à OpenAlex.
 
 ## Corriger et reprendre
 

@@ -6,14 +6,13 @@ the V8.4.4 ledger deliberately blocks automatic re-submission.
 """
 from __future__ import annotations
 
-import time
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 from typing_extensions import TypedDict
 
-from execution.campaign import PilotProtocol, build_report
+from execution.campaign import CampaignBlocked, PilotProtocol, build_report, run_campaign
 from execution.job_manager import DurableJobManager
 
 
@@ -84,32 +83,10 @@ class PilotWorkflow:
         if (state.get("approved") is not True or state.get("approval_sha256") != digest
                 or state.get("protocol_sha256") != digest or state.get("backend") != "docker-local"):
             raise PermissionError("Missing exact campaign/backend approval")
-        for job in protocol.jobs():
-            record = self.manager.submit(job)  # ledger reserves before Docker side effect
-            if record.phase == "succeeded":
-                continue
-            if record.phase not in {"submitted", "running"}:
-                return {"status": "blocked", "message": f"{job.job_id}: {record.phase}; {record.message}"}
-            deadline = time.monotonic() + job.resources.walltime_minutes * 60 + 15
-            try:
-                while time.monotonic() < deadline:
-                    record = self.manager.refresh(job.job_id)
-                    if record.phase not in {"submitted", "running"}:
-                        break
-                    time.sleep(self.poll_seconds)
-                else:
-                    record = self.manager.cancel(job.job_id)
-                    if record.handle is not None:
-                        self.manager.backend.wait(record.handle, timeout=3)
-                    record = self.manager.refresh(job.job_id)
-                    return {"status": "blocked", "message": f"{job.job_id}: timeout, {record.phase}"}
-            except KeyboardInterrupt:
-                self.manager.cancel(job.job_id)
-                if record.handle is not None:
-                    self.manager.backend.wait(record.handle, timeout=3)
-                raise
-            if record.phase != "succeeded":
-                return {"status": "blocked", "message": f"{job.job_id}: {record.phase}; {record.message}"}
+        try:
+            run_campaign(protocol, self.manager, poll_seconds=self.poll_seconds)
+        except CampaignBlocked as error:
+            return {"status": "blocked", "message": str(error)}
         return {"status": "jobs_succeeded", "message": "All jobs finished and artifacts persisted"}
 
     @staticmethod

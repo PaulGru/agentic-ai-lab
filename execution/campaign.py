@@ -12,12 +12,13 @@ import math
 import os
 from pathlib import Path
 import statistics
+import time
 from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
 from execution.contracts import ExperimentJob, ResourceRequest, StrictModel, WorkloadSpec
-from execution.job_manager import DurableJobManager
+from execution.job_manager import ACTIVE_PHASES, TERMINAL_PHASES, DurableJobManager, JobRecord
 from execution.workloads import render_source
 
 
@@ -77,6 +78,42 @@ class PilotProtocol(StrictModel):
             render_source(job)  # exact existing V8.4.2 execution allowlist
             jobs.append(job)
         return jobs
+
+
+class CampaignBlocked(RuntimeError):
+    def __init__(self, record: JobRecord, *, timed_out: bool = False):
+        self.uncertain = record.phase not in TERMINAL_PHASES
+        status = f"timeout, {record.phase}" if timed_out else f"{record.phase}; {record.message}"
+        super().__init__(f"{record.job_id}: {status}")
+
+
+def run_campaign(protocol: PilotProtocol, manager: DurableJobManager, *, poll_seconds: float = 0.1) -> None:
+    """Submit an approved campaign and persist all successful receipts before returning."""
+    for job in protocol.jobs():
+        record = manager.submit(job)
+        if record.phase == "succeeded":
+            continue
+        if record.phase not in ACTIVE_PHASES:
+            raise CampaignBlocked(record)
+        deadline = time.monotonic() + job.resources.walltime_minutes * 60 + 15
+        try:
+            while time.monotonic() < deadline:
+                record = manager.refresh(job.job_id)
+                if record.phase not in ACTIVE_PHASES:
+                    break
+                time.sleep(poll_seconds)
+            else:
+                record = manager.cancel(job.job_id)
+                if record.handle is not None:
+                    manager.backend.wait(record.handle, timeout=3)
+                raise CampaignBlocked(manager.refresh(job.job_id), timed_out=True)
+        except KeyboardInterrupt:
+            manager.cancel(job.job_id)
+            if record.handle is not None:
+                manager.backend.wait(record.handle, timeout=3)
+            raise
+        if record.phase != "succeeded":
+            raise CampaignBlocked(record)
 
 
 def build_report(protocol: PilotProtocol, manager: DurableJobManager) -> dict[str, Any]:
