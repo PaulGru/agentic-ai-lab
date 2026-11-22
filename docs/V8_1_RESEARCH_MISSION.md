@@ -19,10 +19,10 @@ Le fichier doit contenir entre 100 et 12 000 caractères. `## Hypothèses initia
 Depuis la racine du dépôt, avec les dépendances Python et le brief local :
 
 ```powershell
-docker compose -f compose.yaml -f compose.v74.yaml up -d --build db
-python -m scripts.demo_v81 start --thread robustness-001 --brief research_brief.md
-python -m scripts.demo_v81 status --thread robustness-001
-python -m scripts.demo_v81 resume --thread robustness-001 --decision approve
+docker compose -f compose.yaml -f compose.postgres-local.yaml up -d --build db
+python -m scripts.tutorials.research_mission start --thread robustness-001 --brief research_brief.md
+python -m scripts.tutorials.research_mission status --thread robustness-001
+python -m scripts.tutorials.research_mission resume --thread robustness-001 --decision approve
 ```
 
 Répondre `OUI` pour approuver. L'artefact `missions/robustness-001/mission.json` est alors créé (sans écrasement).
@@ -30,7 +30,7 @@ Répondre `OUI` pour approuver. L'artefact `missions/robustness-001/mission.json
 Pour refuser :
 
 ```powershell
-python -m scripts.demo_v81 resume --thread robustness-001 --decision reject
+python -m scripts.tutorials.research_mission resume --thread robustness-001 --decision reject
 ```
 
 Pour une nouvelle proposition après rejet, choisir un nouvel identifiant de thread. Ne pas supprimer les checkpoints historiques.
@@ -42,7 +42,7 @@ python -m unittest tests.test_v81_mission -v
 python -m unittest discover -s tests -v
 ```
 
-Si les dépendances sont installées seulement dans Docker, les exécuter via `docker compose run --rm --entrypoint python lab -m unittest discover -s /app/tests -v` après reconstruction de l'image. La démonstration CLI nécessite le port local PostgreSQL de `compose.v74.yaml`.
+Si les dépendances sont installées seulement dans Docker, les exécuter via `docker compose run --rm --entrypoint python lab -m unittest discover -s /app/tests -v` après reconstruction de l'image. La démonstration CLI nécessite le port local PostgreSQL de `compose.postgres-local.yaml`.
 
 ## Points de vigilance
 

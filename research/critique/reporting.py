@@ -8,6 +8,10 @@ import os
 from pathlib import Path
 
 from analysis.contracts import canonical_json, fingerprint
+from analysis.ood_replay import GPU_SOURCE_KIND
+from analysis.agentic_gpu import SOURCE_KIND as AGENTIC_SOURCE_KIND
+from analysis.executable_protocol import SOURCE_KIND as PROGRAM_SOURCE_KIND
+from analysis.retry_gpu import SOURCE_KIND as RETRY_GPU_SOURCE_KIND
 from analysis.retry_pilot import SOURCE_KIND
 from research.critique.contracts import EvidenceBundle, ReviewReport
 from research.critique.evidence import resolve_ref
@@ -21,11 +25,22 @@ def render_review(bundle: EvidenceBundle, report: ReviewReport) -> str:
     def safe(value):
         return html.escape(str(value)).replace("\n", " ").replace("|", "\\|")
 
-    scope = ("**Pilote contrôlé — appels modèle enregistrés sur un catalogue fictif.**"
-             if bundle.source_kind == SOURCE_KIND else "**Sources synthétiques — aucune conclusion scientifique justifiée.**")
-    lines = ["# Critique du pilote V9" if bundle.source_kind == SOURCE_KIND else "# V8.6 — Critique et révision", "",
-             scope, "",
-             "## Observations calculées", ""]
+    if bundle.source_kind == GPU_SOURCE_KIND:
+        title = "# Critique de la calibration GPU"
+        scope = "**Réponses mesurées sur GPU. Calibration descriptive sur des tâches fictives.**"
+    elif bundle.source_kind == RETRY_GPU_SOURCE_KIND:
+        title = "# Critique du pilote de relance sur GPU"
+        scope = "**Inférence locale sur GPU et panne transitoire injectée dans un catalogue fictif.**"
+    elif bundle.source_kind == SOURCE_KIND:
+        title = "# Critique du pilote V9"
+        scope = "**Pilote contrôlé — appels modèle enregistrés sur un catalogue fictif.**"
+    elif bundle.source_kind in {PROGRAM_SOURCE_KIND, AGENTIC_SOURCE_KIND}:
+        title = "# Critique du protocole exécuté"
+        scope = "**Contrastes descriptifs vérifiés contre les reçus des jobs.**"
+    else:
+        title = "# V8.6 — Critique et révision"
+        scope = "**Sources synthétiques — aucune conclusion scientifique justifiée.**"
+    lines = [title, "", scope, "", "## Observations calculées", ""]
     for ref in report.observation_refs:
         lines.append(f"- {safe(ref)} : {safe(canonical_json(resolve_ref(bundle, ref)))}")
     lines.extend(["", "## Hypothèses à tester", ""])

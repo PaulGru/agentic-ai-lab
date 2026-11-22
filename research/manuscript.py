@@ -11,7 +11,11 @@ from typing import Literal
 from pydantic import Field
 
 from analysis.contracts import HEX_SHA, canonical_json, fingerprint
-from analysis.retry_pilot import RetryPilotAnalysis
+from analysis.ood_replay import OODAnalysis, OODGPUAnalysis
+from analysis.agentic_gpu import AgenticAnalysis
+from analysis.executable_protocol import ProtocolAnalysis
+from analysis.retry_gpu import RetryGPUAnalysis
+from analysis.retry_pilot import PairedRetryAnalysis, RetryPilotAnalysis
 from execution.campaign import save_report
 from execution.contracts import StrictModel
 from research.critique.contracts import Fingerprinted, HumanDecision, LLMRequest, RevisionProposal
@@ -67,7 +71,10 @@ class EditorialOrder(StrictModel):
 
 
 class Manuscript(Fingerprinted):
-    schema_version: Literal["8.8", "9.0"] = "8.8"
+    schema_version: Literal[
+        "8.8", "9.0", "9.0-ood-replay", "9.0-ood-gpu", "9.0-retry-gpu", "9.0-protocol-cpu", "9.0-protocol-gpu",
+        "9.0-agentic-gpu",
+    ] = "8.8"
     review_id: str
     bundle_sha256: str = Field(pattern=HEX_SHA)
     review_sha256: str = Field(pattern=HEX_SHA)
@@ -95,12 +102,31 @@ def build_manuscript(store: ReviewStore, review_id: str) -> Manuscript:
         statements.append(Statement(statement_id=f"S{len(statements) + 1:03}", section=section,
                                     text=text, reference=_ref(artifact, docs[artifact], path)))
 
-    if isinstance(bundle.analysis, RetryPilotAnalysis):
-        _retry_pilot_content(bundle.analysis, docs["bundle"], statement, figure)
-        if bundle.source_document.get("kind") == "brief_retry_study":
+    if isinstance(bundle.analysis, (PairedRetryAnalysis, OODAnalysis, ProtocolAnalysis)):
+        ood_pilot = isinstance(bundle.analysis, OODAnalysis)
+        retry_gpu = isinstance(bundle.analysis, RetryGPUAnalysis)
+        protocol_pilot = isinstance(bundle.analysis, ProtocolAnalysis)
+        if ood_pilot:
+            _ood_content(bundle.analysis, docs["bundle"], statement, figure)
+            schema = "9.0-ood-replay" if bundle.analysis.simulated else "9.0-ood-gpu"
+        elif protocol_pilot:
+            _program_content(bundle, review, docs["bundle"], statement, figure)
+            if isinstance(bundle.analysis, AgenticAnalysis):
+                schema = "9.0-agentic-gpu"
+            else:
+                schema = "9.0-protocol-gpu" if bundle.analysis.gpu_model else "9.0-protocol-cpu"
+            _bibliography_content(bundle.source_document["literature"], "/source_document/literature",
+                                  docs["bundle"], statement, bibliography)
+        else:
+            _retry_pilot_content(bundle.analysis, docs["bundle"], statement, figure)
+            schema = "9.0-retry-gpu" if retry_gpu else "9.0"
+        if ood_pilot or retry_gpu or bundle.source_document.get("kind") == "brief_retry_study":
             protocol = bundle.source_document["protocol"]
             statement("introduction", "/source_document/protocol/requested_question",
                       "Question du brief : " + protocol["requested_question"])
+            if ood_pilot or retry_gpu:
+                for path in review.hypothesis_refs:
+                    statement("introduction", path, "Hypothèse à tester : " + resolve_ref(bundle, path)["claim"])
             statement("methods", "/source_document/protocol/scope", protocol["scope"])
             _bibliography_content(bundle.source_document["literature"], "/source_document/literature",
                                   docs["bundle"], statement, bibliography)
@@ -108,7 +134,7 @@ def build_manuscript(store: ReviewStore, review_id: str) -> Manuscript:
             statement("limitations", f"/issues/{index}", issue.finding + " " + issue.recommendation, "review")
         statement("conclusion", "/conclusion", review.conclusion, "review")
         memory = workflow._memory_snapshot(review_id)
-        return Manuscript(schema_version="9.0", review_id=review_id, bundle_sha256=bundle.fingerprint(),
+        return Manuscript(schema_version=schema, review_id=review_id, bundle_sha256=bundle.fingerprint(),
                           review_sha256=review.fingerprint(), analysis_sha256=bundle.analysis.fingerprint(),
                           memory_context_sha256=fingerprint(memory) if memory is not None else None,
                           statements=statements, bibliography=bibliography, figure=figure)
@@ -184,8 +210,75 @@ def _bibliography_content(literature, root, document, statement, bibliography):
                                      reference=_ref("bundle", document, root + f"/catalog/papers/{index}")))
 
 
+def _ood_content(analysis, document, statement, figure):
+    statement("methods", "/source_document/protocol/measured_question",
+              "Objectif du test d’intégration : " + document["source_document"]["protocol"]["measured_question"])
+    if isinstance(analysis, OODGPUAnalysis):
+        statement("methods", "/analysis/model_revision", "Révision de Qwen : " + analysis.model_revision)
+        statement("methods", "/analysis/runtime", "Carte : " + analysis.runtime.gpu_name + " · BF16")
+    qualifier = " simulées" if analysis.simulated else ""
+    for group, arm in sorted(analysis.arms.items()):
+        path = f"/analysis/arms/{group}"
+        statement("results", path, f"{group} — {arm.correct}/{arm.total} réponses exactes{qualifier}.")
+        figure.append(FigureRow(group=group, mean=arm.accuracy_percent, reference=_ref("bundle", document, path)))
+    for model, points in sorted(analysis.degradation_points.items()):
+        statement("results", f"/analysis/degradation_points/{model}",
+                  f"{model} — écart référence moins OOD : {points:g} points de pourcentage.")
+
+
+def _program_content(bundle, review, document, statement, figure):
+    root = "/source_document"
+    question = root + "/mission/mission/research_question"
+    statement("introduction", question, resolve_ref(bundle, question))
+    for path in review.hypothesis_refs:
+        statement("introduction", path, "Hypothèse à tester. " + resolve_ref(bundle, path)["claim"])
+    design = root + "/protocol/document"
+    statement("methods", design + "/objective", resolve_ref(bundle, design + "/objective"))
+    if selection := bundle.source_document["protocol"].get("resource_selection"):
+        resource = selection["resource"]
+        statement("methods", root + "/protocol/resource_selection/resource",
+                  f"Corpus sélectionné. {resource['description']} Source versionnée : {resource['origin']}.")
+    if isinstance(bundle.analysis, AgenticAnalysis):
+        for key, model in bundle.analysis.models.items():
+            statement("methods", f"/analysis/models/{key}",
+                      f"{model['id']}, révision {model['revision']}, architecture {model['architecture']}, {model['size']}.")
+        statement("methods", root + "/protocol/execution_constraints/scoring",
+                  resolve_ref(bundle, root + "/protocol/execution_constraints/scoring"))
+    elif bundle.analysis.gpu_model:
+        statement("methods", "/analysis/gpu_model", f"Inférence sur GPU avec {bundle.analysis.gpu_model}.")
+        statement("methods", "/analysis/gpu_revision", f"Révision du snapshot : {bundle.analysis.gpu_revision}.")
+        statement("methods", "/analysis/gpu_runtime/gpu_name", f"Carte utilisée : {bundle.analysis.gpu_runtime.gpu_name}.")
+    else:
+        statement("methods", root + "/evaluation/schema_version", "Exécution locale d'une règle numérique sur CPU.")
+    if not isinstance(bundle.analysis, AgenticAnalysis):
+        statement("methods", root + "/evaluation/cases",
+                  "Chaque prédiction entière est comparée à une réponse de référence indépendante.")
+    for cell, score in bundle.analysis.cells.items():
+        path = f"/analysis/cells/{cell}"
+        levels = ", ".join(f"{name}={level}" for name, level in score.levels.items())
+        statement("results", path, f"{cell} ({levels}). {score.correct}/{score.total} réponses exactes.")
+        figure.append(FigureRow(group=cell, mean=score.accuracy_percent,
+                                reference=_ref("bundle", document, path + "/accuracy_percent")))
+    for key, contrast in bundle.analysis.contrasts.items():
+        statement("results", f"/analysis/contrasts/{key}",
+                  f"{key}, {contrast.level_b} par rapport à {contrast.level_a}. "
+                  f"Écart de {contrast.gain_points:+g} points de pourcentage sur {contrast.pairs} paires.")
+    if isinstance(bundle.analysis, AgenticAnalysis):
+        for key, gap in bundle.analysis.shift_gaps.items():
+            statement("results", f"/analysis/shift_gaps/{key}",
+                      f"{key}. Baisse de {gap.drop_points:+g} points par rapport au contrôle. "
+                      f"Sensibilité en retirant une tâche à la fois, de {gap.task_sensitivity_min:+g} "
+                      f"à {gap.task_sensitivity_max:+g} points.")
+
+
 def _retry_pilot_content(analysis, document, statement, figure):
-    statement("introduction", "/analysis/question", analysis.question)
+    if isinstance(analysis, RetryGPUAnalysis):
+        statement("introduction", "/analysis/measured_question", analysis.measured_question)
+        statement("methods", "/analysis/revision", f"Révision du modèle évalué : {analysis.revision}.")
+        statement("methods", "/analysis/runtime/gpu_name", f"Carte utilisée : {analysis.runtime.gpu_name}.")
+        statement("methods", "/analysis/estimand", analysis.estimand)
+    else:
+        statement("introduction", "/analysis/question", analysis.question)
     statement("methods", "/analysis/model", f"Modèle étudié : {analysis.model}.")
     statement("methods", "/analysis/task_count", f"{analysis.task_count} tâches distinctes, appariées par tâche.")
     statement("methods", "/analysis/trial_count", f"{analysis.trial_count} essais mesurés.")
@@ -207,8 +300,9 @@ def _retry_pilot_content(analysis, document, statement, figure):
         statement("results", root + "/gain_points", f"{label} : écart apparié de {comparison.gain_points:+g} points.")
     statement("results", "/analysis/comparison/transient/retry_only",
               f"Sous erreur transitoire, {analysis.comparison['transient'].retry_only} tâches réussissent uniquement avec relance.")
-    statement("results", "/analysis/generation_cost_estimate_usd", "Coût estimé des générations mesurées aux tarifs "
-              f"standard : {analysis.generation_cost_estimate_usd} USD.")
+    if isinstance(analysis, RetryPilotAnalysis):
+        statement("results", "/analysis/generation_cost_estimate_usd", "Coût estimé des générations mesurées aux tarifs "
+                  f"standard : {analysis.generation_cost_estimate_usd} USD.")
 
 
 def make_editorial_request(store, manuscript, settings):
@@ -292,36 +386,81 @@ def _md(value, *, escape_quotes=True):
 
 
 def render_markdown(manuscript):
-    retry_pilot = manuscript.schema_version == "9.0"
-    if retry_pilot:
+    protocol_pilot = manuscript.schema_version in {"9.0-protocol-cpu", "9.0-protocol-gpu", "9.0-agentic-gpu"}
+    retry_gpu = manuscript.schema_version == "9.0-retry-gpu"
+    retry_pilot = manuscript.schema_version == "9.0" or retry_gpu
+    ood_replay = manuscript.schema_version == "9.0-ood-replay"
+    ood_gpu = manuscript.schema_version == "9.0-ood-gpu"
+    ood_pilot = ood_replay or ood_gpu
+    if manuscript.schema_version == "9.0-agentic-gpu":
+        lines = ["# Pilote de robustesse agentique sur GPU", "", "## Résumé", "",
+                 "Le pilote compare plusieurs checkpoints et deux politiques sur des tâches de lecture appariées.", ""]
+    elif protocol_pilot:
+        target = "GPU" if manuscript.schema_version == "9.0-protocol-gpu" else "CPU"
+        lines = [f"# Pilote numérique sur {target}", "", "## Résumé", "",
+                 "L'étude mesure des contrastes appariés sur un corpus fixé avant l'exécution.", ""]
+    elif retry_gpu:
+        lines = ["# Pilote GPU — Relance après une erreur d’outil", "",
+                 "**Inférence locale sur des tâches de catalogue contrôlées.**", "", "## Résumé", "",
+                 "Le pilote compare la relance sous panne transitoire injectée sur une révision de Qwen.", ""]
+    elif retry_pilot:
         lines = ["# Pilote V9 — Relance après une erreur d’outil", "",
                  "**Analyse descriptive d'appels modèle sur des tâches de catalogue contrôlées.**", "", "## Résumé", "",
                  "Le pilote compare l'exactitude des réponses avec et sans relance après une erreur de lecture.", ""]
+    elif ood_replay:
+        lines = ["# Répétition OOD hors ligne", "", "**Manuscrit pédagogique — réponses fictives.**", "", "## Résumé", "",
+                 "Ce test vérifie le passage des réponses simulées aux scores et aux conclusions du brouillon.", ""]
+    elif ood_gpu:
+        lines = ["# Calibration OOD sur GPU", "", "**Manuscrit pédagogique — calibration descriptive.**", "", "## Résumé", "",
+                 "Ce pilote vérifie le passage des réponses de Qwen aux scores sur deux tâches appariées.", ""]
     else:
         lines = ["# Démonstration du processus de recherche", "",
                  "**Manuscrit pédagogique — données synthétiques.**", "", "## Résumé", "",
                  "Ce document présente les étapes et résultats d'une démonstration reproductible.", ""]
     for section, heading in SECTIONS.items():
-        if retry_pilot and section == "related_work" and not manuscript.bibliography:
+        if (retry_pilot or ood_pilot or protocol_pilot) and section == "related_work" and not manuscript.bibliography:
             continue
-        if retry_pilot and section == "results":
+        if (retry_pilot or protocol_pilot) and section == "results":
             heading = "Résultats du pilote"
+        elif ood_replay and section == "results":
+            heading = "Résultats simulés"
+        elif ood_gpu and section == "results":
+            heading = "Résultats de calibration"
         lines.extend([f"## {heading}", ""])
         for statement in manuscript.statements:
             if statement.section == section:
                 ref = statement.reference
-                lines.extend([f"{_md(statement.text, escape_quotes=not retry_pilot)} ({statement.statement_id})",
+                lines.extend([f"{_md(statement.text, escape_quotes=not (retry_pilot or ood_pilot))} ({statement.statement_id})",
                               f"`{ref.artifact}{ref.pointer}`", ""])
         if section == "results":
-            caption = "Taux de réponses exactes par condition" if retry_pilot else "Moyennes synthétiques par groupe"
+            caption = ("Taux de réponses exactes par condition" if retry_pilot or ood_pilot or protocol_pilot
+                       else "Moyennes synthétiques par groupe")
             lines.extend([f"![{caption}](figure.svg)", ""])
-    if retry_pilot:
+    if protocol_pilot:
+        lines.extend(["## Traçabilité", "",
+                      "Le dossier de preuves relie le protocole et le plan d'action aux prédictions et aux reçus SQLite.", "",
+                      "## Bibliographie", "", "Références de la revue approuvée au niveau des résumés.", ""])
+    elif retry_gpu:
+        lines.extend(["## Traçabilité", "",
+                      "Les scores renvoient aux essais appariés et à leurs empreintes. "
+                      "Le dossier de preuves lie le protocole, le plan d'action et le reçu GPU conservé dans SQLite.", "",
+                      "## Bibliographie", "", "Références de la revue approuvée au niveau des résumés.", ""])
+    elif retry_pilot:
         lines.extend(["## Traçabilité", "",
                       "Dans le dossier de preuves, les résultats par condition listent leurs identifiants d'essai. "
                       "La liste des essais contient l'empreinte des événements correspondants dans le journal SQLite.", "",
                       "## Bibliographie", "",
                       ("Références de la revue approuvée, vérifiées au niveau des résumés."
                        if manuscript.bibliography else "À compléter à partir d'une revue bibliographique validée."), ""])
+    elif ood_replay:
+        lines.extend(["## Traçabilité", "",
+                      "Chaque score de groupe renvoie aux identifiants de jobs. Les scores individuels "
+                      "conservent les empreintes des jobs et des artefacts enregistrés dans SQLite.", "",
+                      "## Bibliographie", "", "Notices de la revue approuvée au niveau des résumés.", ""])
+    elif ood_gpu:
+        lines.extend(["## Traçabilité", "",
+                      "Chaque score renvoie aux essais du lot GPU et à leur reçu dans le journal SQLite.", "",
+                      "## Bibliographie", "", "Notices de la revue approuvée au niveau des résumés.", ""])
     else:
         lines.extend(["## Bibliographie — métadonnées du catalogue de démonstration", ""])
     for entry in manuscript.bibliography:
@@ -332,7 +471,7 @@ def render_markdown(manuscript):
 
 def render_figure(manuscript):
     rows = manuscript.figure
-    if manuscript.schema_version == "9.0":
+    if manuscript.schema_version.startswith("9."):
         height = 70 + 42 * len(rows)
         elements = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 {height}" role="img">',
                     '<title>Taux de réponses exactes par condition</title>',

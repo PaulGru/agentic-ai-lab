@@ -21,7 +21,7 @@ from research.literature_search import (
     OpenAlexClient, InsufficientLiteratureError, reconstruct_abstract, retrieve_catalog,
 )
 from research.mission import ResearchMission, mission_digest
-from scripts.demo_v82 import config_for, export_approved_literature
+from scripts.tutorials.literature_review import config_for, export_approved_literature
 from tests.fakes import FakeProvider
 
 

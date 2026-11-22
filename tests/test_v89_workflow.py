@@ -24,7 +24,7 @@ from research.memory.sources import pointer
 from research.research_workflow import (
     ArithmeticSimulation, ResearchWorkflow, WorkflowInput, config_for, make_plan, pending_decision,
 )
-from scripts.demo_v89 import load_request
+from scripts.tutorials.synthetic_research_workflow import load_request
 from tests.fakes import FakeProvider
 
 

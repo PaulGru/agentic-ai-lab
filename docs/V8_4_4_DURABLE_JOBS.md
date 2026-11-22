@@ -30,11 +30,11 @@ handle après vérification. Il n'existe **aucun** retry automatique.
 
 ```powershell
 python -m unittest discover -s tests -p "test_v844_job_manager.py" -v
-python -m scripts.demo_v844 submit --job examples/v841_job.json
-python -m scripts.demo_v844 status --job examples/v841_job.json
-python -m scripts.demo_v844 advance --job examples/v841_job.json
-python -m scripts.demo_v844 advance --job examples/v841_job.json
-python -m scripts.demo_v844 collect --job examples/v841_job.json
+python -m scripts.tutorials.durable_jobs submit --job examples/v841_job.json
+python -m scripts.tutorials.durable_jobs status --job examples/v841_job.json
+python -m scripts.tutorials.durable_jobs advance --job examples/v841_job.json
+python -m scripts.tutorials.durable_jobs advance --job examples/v841_job.json
+python -m scripts.tutorials.durable_jobs collect --job examples/v841_job.json
 ```
 
 La dernière commande retourne des artefacts simulés vides. Le redémarrage entre les commandes

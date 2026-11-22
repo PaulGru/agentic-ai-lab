@@ -33,12 +33,12 @@ Préparer une mission V8.1 approuvée et exportée, les dépendances Python, un
 PostgreSQL local exposé sur le port 55432 et les clés du fournisseur LLM.
 
 ```powershell
-docker compose -f compose.yaml -f compose.v74.yaml up -d db
-python -m scripts.demo_v82 start --thread robustness-001 --mission missions/robustness-001/mission.json
-python -m scripts.demo_v82 status --thread robustness-001
-python -m scripts.demo_v82 resume --thread robustness-001 --decision approve
+docker compose -f compose.yaml -f compose.postgres-local.yaml up -d db
+python -m scripts.tutorials.literature_review start --thread robustness-001 --mission missions/robustness-001/mission.json
+python -m scripts.tutorials.literature_review status --thread robustness-001
+python -m scripts.tutorials.literature_review resume --thread robustness-001 --decision approve
 # Si besoin, ré-exporter sans relancer le LLM :
-python -m scripts.demo_v82 export --thread robustness-001
+python -m scripts.tutorials.literature_review export --thread robustness-001
 ```
 
 Changer `--thread` pour recommencer une nouvelle revue ; un thread existant ne peut être réécrit. `--max-queries` de 1 à 4 et `--per-query` de 1 à 10 peuvent être précisés à `start` pour réduire les appels.

@@ -9,14 +9,25 @@ from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
+from analysis.agentic_gpu import AgenticAnalysis, SOURCE_KIND as AGENTIC_SOURCE_KIND
 from analysis.contracts import HEX_SHA, ID, canonical_json, fingerprint
+from analysis.ood_replay import GPU_SOURCE_KIND, OODGPUAnalysis, OODReplayAnalysis, SOURCE_KIND as OOD_SOURCE_KIND
+from analysis.executable_protocol import ProtocolAnalysis, SOURCE_KIND as PROGRAM_SOURCE_KIND
+from analysis.retry_gpu import RetryGPUAnalysis, SOURCE_KIND as RETRY_GPU_SOURCE_KIND
 from analysis.retry_pilot import RetryPilotAnalysis, SOURCE_KIND
 from analysis.stat_contracts import AnalysisReport
 from execution.contracts import StrictModel
 from research.experimental_design import ExperimentalDesign
 
-SourceKind = Literal["verified_pilot_aggregates", "pedagogical_paired_fixture", "verified_retry_pilot"]
+SourceKind = Literal["verified_pilot_aggregates", "pedagogical_paired_fixture", "verified_retry_pilot",
+                     "verified_ood_replay", "verified_ood_gpu", "verified_retry_gpu", "verified_executable_protocol",
+                     "verified_agentic_gpu"]
+V9_SOURCE_KINDS = {SOURCE_KIND, OOD_SOURCE_KIND, GPU_SOURCE_KIND, RETRY_GPU_SOURCE_KIND, PROGRAM_SOURCE_KIND, AGENTIC_SOURCE_KIND}
 PILOT_CONCLUSION = "Les observations décrivent ce pilote contrôlé avec un seul modèle et huit tâches."
+OOD_CONCLUSION = "La répétition valide la reconstruction des scores à partir de réponses fictives."
+GPU_CONCLUSION = "Les scores décrivent la calibration GPU sur deux tâches et une révision de Qwen."
+CPU_CONCLUSION = "Les contrastes décrivent le protocole mesuré sur le corpus numérique du pilote."
+AGENTIC_CONCLUSION = "Les contrastes décrivent les différences observées entre ces checkpoints et politiques sur le corpus agentique du pilote."
 POINTER = r"^/(?:[A-Za-z0-9_~./-]){1,300}$"
 
 
@@ -44,7 +55,9 @@ class EvidenceBundle(Fingerprinted):
     schema_version: Literal["8.6", "9.0"] = "8.6"
     source_kind: SourceKind
     source_document: dict[str, Any]
-    analysis: AnalysisReport | RetryPilotAnalysis = Field(discriminator="source_kind")
+    analysis: (
+        AnalysisReport | RetryPilotAnalysis | RetryGPUAnalysis | OODReplayAnalysis | OODGPUAnalysis | ProtocolAnalysis | AgenticAnalysis
+    ) = Field(discriminator="source_kind")
     dataset_document: dict[str, Any] | None = None
     quality_document: dict[str, Any] | None = None
     context: DesignContext | None = None
@@ -56,10 +69,10 @@ class EvidenceBundle(Fingerprinted):
     def bounded_and_consistent(self):
         if self.source_kind != self.analysis.source_kind:
             raise ValueError("Evidence source kind differs from analysis")
-        if (self.schema_version == "9.0") != (self.source_kind == SOURCE_KIND):
+        if (self.schema_version == "9.0") != (self.source_kind in V9_SOURCE_KINDS):
             raise ValueError("Evidence version differs from its source kind")
-        if self.source_kind == SOURCE_KIND and self.context is not None:
-            raise ValueError("V9 retry evidence uses the approved journal plan as context")
+        if self.source_kind in V9_SOURCE_KINDS and self.context is not None:
+            raise ValueError("V9 evidence uses the approved pilot protocol as context")
         pilot = self.source_kind == "verified_pilot_aggregates"
         if pilot != (self.dataset_document is not None and self.quality_document is not None):
             raise ValueError("Pilot evidence requires dataset and quality documents")
@@ -110,7 +123,11 @@ class ReviewReport(Fingerprinted):
     issues: list[CritiqueIssue]
     claim_assessments: list[ClaimAssessment]
     conclusion: Literal["Engineering or pedagogical review only; no scientific claims justified",
-                        "Les observations décrivent ce pilote contrôlé avec un seul modèle et huit tâches."] = (
+                        "Les observations décrivent ce pilote contrôlé avec un seul modèle et huit tâches.",
+                        "La répétition valide la reconstruction des scores à partir de réponses fictives.",
+                        "Les scores décrivent la calibration GPU sur deux tâches et une révision de Qwen.",
+                        "Les contrastes décrivent le protocole mesuré sur le corpus numérique du pilote.",
+                        "Les contrastes décrivent les différences observées entre ces checkpoints et politiques sur le corpus agentique du pilote."] = (
         "Engineering or pedagogical review only; no scientific claims justified")
     scientific_evidence: Literal[False] = False
     ready_for_scientific_inference: Literal[False] = False
@@ -194,8 +211,8 @@ class ReviewInput(Fingerprinted):
             raise ValueError("LLM assistance requires explicit provider/model settings")
         if (self.source_kind != "pedagogical_paired_fixture") != (self.jobs_db is not None):
             raise ValueError("Pilot inputs require their existing SQLite ledger")
-        if self.source_kind == SOURCE_KIND and (self.context_path or self.assist_critique or self.assist_revision or self.llm):
-            raise ValueError("V9 retry reviews use deterministic critique with their own measured protocol")
+        if self.source_kind in V9_SOURCE_KINDS and (self.context_path or self.assist_critique or self.assist_revision or self.llm):
+            raise ValueError("V9 reviews use deterministic critique with their own protocol")
         if self.assist_revision and self.context_path is None:
             raise ValueError("Protocol revision requires an approved design context")
         return self

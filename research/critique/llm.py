@@ -102,7 +102,7 @@ def call_llm(request: LLMRequest, decision: HumanDecision, store: ReviewStore, *
         provider = provider_factory(request)
         runner = AgentRunner(name="scientific_" + request.role,
                              description="Assistance bornée à la critique scientifique",
-                             instructions=request.instructions, provider=provider, registry=ToolRegistry())
+                             instructions=request.instructions, prompt_version=1, provider=provider, registry=ToolRegistry())
         response = runner.propose(request.prompt)
     except Exception as error:
         store.fail_call(request, invalid_response=False, error_type=type(error).__name__)

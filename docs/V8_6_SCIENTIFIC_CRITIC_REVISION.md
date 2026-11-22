@@ -14,7 +14,7 @@ aucune campagne scientifique, aucun appel HPC et aucune soumission de job.
 | V8.6.4 — Assistance LLM | `llm.py` utilise l'interface multi-provider et `AgentRunner`, sans outils ni web natif. Les adaptateurs reçoivent des limites de sortie et de délai, avec retries désactivés. Les valeurs par défaut des usages historiques restent inchangées. |
 | V8.6.5 — Révision | `revision.py` calcule un diff, exige une justification par changement et revalide `ExperimentalDesign`. Le planificateur V8.3 seul n'exprime pas la filiation d'une révision motivée par une critique. |
 | V8.6.6 — Orchestration | `graph.py` rend explicites les pauses, les décisions et les reprises dans `v86-critic:`. Les sources sont relues après les interruptions. Autoriser un appel LLM et adopter un protocole sont deux décisions distinctes. |
-| V8.6.7 — Démonstration | `demo_v86.py`, les exemples fictifs et les tests rendent les comportements observables. `check_v86_postgres.py` vérifie une reprise entre processus avec un vrai checkpointer PostgreSQL. |
+| V8.6.7 — Démonstration | `scripts/tutorials/scientific_critic.py`, les exemples fictifs et les tests rendent les comportements observables. `scripts/checks/critic_postgres.py` vérifie une reprise entre processus avec un vrai checkpointer PostgreSQL. |
 
 Pydantic, LangGraph, SQLite et la bibliothèque standard étaient déjà présents.
 Aucune dépendance n'est ajoutée. Pydantic contrôle les structures, SQLite
@@ -89,11 +89,11 @@ avec `cycle_limit` ; elle n'accorde pas une boucle illimitée.
 Depuis la racine du dépôt, avec l'environnement Python existant :
 
 ```powershell
-python -m scripts.demo_v86 preview --input examples/v86_review_input.json
-python -m scripts.demo_v86 offline --input examples/v86_review_input.json --draft examples/v86_revision_draft.json
-python -m scripts.demo_v86 export --review v86-demo-001 --out-dir runs_control/v86_export_001
-python -m scripts.demo_v86 inspect --out-dir runs_control/v86_export_001
-python -m scripts.demo_v86 verify --review v86-demo-001
+python -m scripts.tutorials.scientific_critic preview --input examples/v86_review_input.json
+python -m scripts.tutorials.scientific_critic offline --input examples/v86_review_input.json --draft examples/v86_revision_draft.json
+python -m scripts.tutorials.scientific_critic export --review v86-demo-001 --out-dir runs_control/v86_export_001
+python -m scripts.tutorials.scientific_critic inspect --out-dir runs_control/v86_export_001
+python -m scripts.tutorials.scientific_critic verify --review v86-demo-001
 ```
 
 `preview` n'écrit aucun historique. `offline` interdit les options d'assistance
@@ -116,10 +116,10 @@ et la préparation de cet environnement sont des opérations explicitement
 autorisées par l'opérateur ; les commandes ne lancent pas Docker à sa place.
 
 ```powershell
-python -m scripts.demo_v86 start --input examples/v86_review_input.json
-python -m scripts.demo_v86 status --review v86-demo-001
-python -m scripts.demo_v86 resume --review v86-demo-001 --decision propose --draft examples/v86_revision_draft.json --actor local-operator
-python -m scripts.demo_v86 resume --review v86-demo-001 --decision approve --actor local-operator
+python -m scripts.tutorials.scientific_critic start --input examples/v86_review_input.json
+python -m scripts.tutorials.scientific_critic status --review v86-demo-001
+python -m scripts.tutorials.scientific_critic resume --review v86-demo-001 --decision propose --draft examples/v86_revision_draft.json --actor local-operator
+python -m scripts.tutorials.scientific_critic resume --review v86-demo-001 --decision approve --actor local-operator
 ```
 
 Le dernier appel affiche la proposition exacte puis demande `APPROVE`.
@@ -207,7 +207,7 @@ Contrôle d'intégration **séparé**, avec un PostgreSQL approuvé :
 
 ```powershell
 # V86_TEST_DATABASE_URL ou DATABASE_URL configurée sans l'imprimer
-python -m scripts.check_v86_postgres
+python -m scripts.checks.critic_postgres
 ```
 
 Il crée un schéma neuf `v86_test_<uuid>` et vérifie approbation et rejet dans

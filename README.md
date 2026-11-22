@@ -40,12 +40,14 @@ pilote simulé, au critique, à la mémoire puis au manuscrit, avec points de
 validation humaine. Voir les guides [V8.8](docs/V8_8_SCIENTIFIC_PAPER_WRITER.md)
 et [V8.9](docs/V8_9_RESEARCH_WORKFLOW.md).
 
-Le [workflow de recherche depuis un brief](docs/WORKFLOW_RECHERCHE.md)
-enchaîne mission, littérature, protocole et manuscrit. Il conserve les
-versions et permet de revenir à une étape à corriger.
+Le workflow de recherche depuis un brief enchaîne mission, littérature,
+protocole et manuscrit. Il conserve les versions et permet de revenir à une
+étape à corriger. La commande principale est `python -m scripts.research_workflow`.
+Voir le [guide du workflow](docs/WORKFLOW_RECHERCHE.md) et
+l'[index des commandes](scripts/README.md).
 
 Pour découvrir le parcours complet, prévisualiser le pilote depuis la racine
-du dépôt avec `python -m scripts.demo_v89 plan --input examples/v89_workflow.json`.
+du dépôt avec `python -m scripts.tutorials.synthetic_research_workflow plan --input examples/v89_workflow.json`.
 Le guide V8.9 décrit ensuite le lancement hors ligne.
 
 ## Fonctionnalités
@@ -94,7 +96,7 @@ Tests Python :
 
 Tests HTTP :
 
-    docker compose exec -T api python /app/scripts/smoke_v54.py
+    docker compose exec -T api python -m unittest -v scripts.checks.api_http scripts.checks.research_http
 
 ## Roadmap
 

@@ -61,6 +61,7 @@ class MissionPlanner:
             name="mission_planner",
             description="Formalise un programme de recherche scientifique",
             instructions=MISSION_INSTRUCTIONS + (MEMORY_INSTRUCTIONS if memory else ""),
+            prompt_version=1,
             provider=provider,
             registry=ToolRegistry(),
         )

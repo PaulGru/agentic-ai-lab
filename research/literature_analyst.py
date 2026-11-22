@@ -54,6 +54,7 @@ class LiteratureAnalyst:
             name="literature_analyst",
             description="Relie les affirmations à des extraits réellement récupérés",
             instructions=LITERATURE_INSTRUCTIONS + (MEMORY_INSTRUCTIONS if memory else ""),
+            prompt_version=1,
             provider=provider,
             registry=ToolRegistry(),
         )

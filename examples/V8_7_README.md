@@ -7,9 +7,9 @@ Les sorties restent sous `runs_control/`, exclu de Git.
 Depuis la racine du dépôt, dans son environnement Python :
 
 ```powershell
-python -m scripts.demo_v87_memory --project demo init
-python -m scripts.demo_v87_memory --project demo import-context --path examples/v86_design_context.json
-python -m scripts.demo_v87_memory --project demo search --query "robustesse agents" --kind hypothesis
+python -m scripts.research_memory --project demo init
+python -m scripts.research_memory --project demo import-context --path examples/v86_design_context.json
+python -m scripts.research_memory --project demo search --query "robustesse agents" --kind hypothesis
 ```
 
 La recherche retourne des souvenirs avec leur statut et leurs références,
@@ -19,8 +19,8 @@ que la récupération ne dépend pas du processus ou d'un `thread_id`.
 Pour faire consulter cette mémoire par le critique, puis y conserver sa revue :
 
 ```powershell
-python -m scripts.demo_v86 --memory-db runs_control/v87_memory.sqlite3 --project demo --store runs_control/v87_demo_reviews.sqlite3 offline --input examples/v86_review_input.json --out-dir runs_control/v87_demo_report
-python -m scripts.demo_v87_memory --project demo search --query "indépendance réplication" --kind lesson
+python -m scripts.tutorials.scientific_critic --memory-db runs_control/v87_memory.sqlite3 --project demo --store runs_control/v87_demo_reviews.sqlite3 offline --input examples/v86_review_input.json --out-dir runs_control/v87_demo_report
+python -m scripts.research_memory --project demo search --query "indépendance réplication" --kind lesson
 ```
 
 Sans draft, ce parcours produit une revue seule. Une nouvelle invocation avec

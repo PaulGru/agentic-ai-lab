@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 from langgraph.checkpoint.memory import InMemorySaver
 
-from agent.models import LLMResponse
+from agent.models import LLMResponse, ToolResult
 from providers.openai_provider import OpenAIProvider
 from providers.anthropic_provider import AnthropicProvider
 from research.factory import build_research_graph
@@ -63,6 +63,20 @@ class V62NativeSearchTests(unittest.TestCase):
         )
         self.assertTrue(result.web_search_used)
         self.assertEqual(result.sources[0]["url"], URL)
+        self.assertNotIn("reasoning", request)
+
+    def test_astra_uses_low_reasoning_on_start_and_tool_continuation(self):
+        client = Mock()
+        client.responses.create.return_value = SimpleNamespace(id="response-test", output=[], output_text="OK")
+        with patch("providers.openai_provider.OpenAI", return_value=client):
+            provider = OpenAIProvider("gpt-6.2-astra", max_output_tokens=4000)
+            provider.start("Prépare l'expérience")
+            provider.continue_with_tool_results([ToolResult(call_id="test-call", name="lookup", output="ok")])
+        start, continuation = [call.kwargs for call in client.responses.create.call_args_list]
+        self.assertEqual(start["reasoning"], {"effort": "low"})
+        self.assertEqual(continuation["reasoning"], start["reasoning"])
+        self.assertEqual(continuation["previous_response_id"], "response-test")
+        self.assertEqual(continuation["max_output_tokens"], 4000)
 
     def test_anthropic_native_search(self):
         client = Mock()

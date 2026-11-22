@@ -13,6 +13,8 @@ from langgraph.types import interrupt
 from typing_extensions import TypedDict
 
 from analysis.contracts import fingerprint
+from analysis.retry_gpu import RetryGPUAnalysis
+from analysis.executable_protocol import ProtocolAnalysis
 from analysis.retry_pilot import RetryPilotAnalysis
 from providers.base import LLMProvider
 from research.critique.contracts import (
@@ -152,6 +154,10 @@ class ReviewWorkflow:
                     else bundle.source_document.get("metric_name", "synthetic mean"))
         if isinstance(bundle.analysis, RetryPilotAnalysis):
             question = bundle.analysis.question
+        elif isinstance(bundle.analysis, RetryGPUAnalysis):
+            question = bundle.analysis.measured_question
+        elif isinstance(bundle.analysis, ProtocolAnalysis):
+            question = bundle.source_document["mission"]["mission"]["research_question"]
         context = self.memory.retrieve("scientific_critic", "réplication refus protocole " + question,
                                        exclude_review_id=request.review_id)
         self.store.put("memory_context", request.review_id, request.review_id, context.model_dump(mode="json"))

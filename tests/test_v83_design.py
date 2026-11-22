@@ -20,7 +20,7 @@ from research.experimental_design import (
 )
 from research.literature import LiteratureReview, digest_json
 from research.mission import ResearchMission
-from scripts.demo_v83 import config_for, export_approved_design
+from scripts.tutorials.experimental_design import config_for, export_approved_design
 from tests.fakes import FakeProvider
 from tests.test_v82_literature import approved_document, fake_catalog, valid_review
 

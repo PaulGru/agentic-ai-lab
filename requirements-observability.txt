@@ -1,0 +1,2 @@
+# Optional, for the offline experiment tracker.
+wandb==0.31.1

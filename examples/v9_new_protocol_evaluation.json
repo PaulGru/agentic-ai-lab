@@ -1,0 +1,12 @@
+{
+  "schema_version": "cpu.integer_exact.v1",
+  "cases": [
+    {"id": "first", "inputs": {"overlap_a": 2, "overlap_b": 3, "weighted_a": 7, "weighted_b": 4}, "expected": 1},
+    {"id": "second", "inputs": {"overlap_a": 6, "overlap_b": 3, "weighted_a": 2, "weighted_b": 4}, "expected": 2},
+    {"id": "third", "inputs": {"overlap_a": 5, "overlap_b": 1, "weighted_a": 8, "weighted_b": 5}, "expected": 1}
+  ],
+  "witnesses": [
+    {"inputs": {"overlap_a": 1, "overlap_b": 2, "weighted_a": 5, "weighted_b": 3}, "levels": {"method": "overlap"}, "expected": 2},
+    {"inputs": {"overlap_a": 1, "overlap_b": 2, "weighted_a": 5, "weighted_b": 3}, "levels": {"method": "weighted"}, "expected": 1}
+  ]
+}

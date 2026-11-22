@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Suivi de recherche · Agentic AI Lab</title>
+  <link rel="stylesheet" href="/dashboard.css">
+  <script defer src="/dashboard.js"></script>
+</head>
+<body>
+  <header class="masthead"><div class="frame masthead-inner"><strong>Agentic AI Lab</strong><span id="connection">Connexion locale</span></div></header>
+  <main class="frame">
+    <div class="heading">
+      <div><p class="eyebrow">Suivi de recherche</p><h1 id="mission">Mission</h1></div>
+      <span id="run-status" class="status" role="status"></span>
+    </div>
+    <div class="layout">
+      <section class="timeline" aria-labelledby="timeline-title">
+        <div class="section-head"><h2 id="timeline-title">Journal de la mission</h2><span id="step-count"></span></div>
+        <ol id="steps" reversed></ol>
+      </section>
+      <div class="details">
+        <section class="card current" aria-labelledby="snapshot-title">
+          <div class="section-head"><h2 id="snapshot-title">État actuel</h2><button id="back" type="button" hidden>Revenir au direct</button></div>
+          <p class="stage" id="stage">En attente du journal…</p>
+          <p id="message"></p>
+          <p id="step-pdf"></p>
+          <details id="snapshot-data" hidden><summary>Contenu à ce jalon</summary><dl id="highlights"></dl></details>
+        </section>
+        <section class="card" aria-labelledby="editions-title">
+          <div class="section-head"><h2 id="editions-title">Versions du manuscrit</h2><span>PDF ACL</span></div>
+          <ul id="editions"></ul>
+        </section>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

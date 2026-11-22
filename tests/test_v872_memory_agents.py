@@ -153,7 +153,7 @@ class MemoryAgentTests(unittest.TestCase):
         self.assertGreater(graph.get_state(cfg).values["memory_indexed_items"], 0)
         self.assertEqual(pending_review(graph.get_state(cfg))["kind"], "v86_revision_input")
         # A historical reconstruction can inspect the recorded LLM request without reconnecting memory.
-        from scripts.demo_v86 import verify_recorded_review
+        from scripts.tutorials.scientific_critic import verify_recorded_review
         verify_recorded_review(self.reviews, request.review_id)
 
     def test_invalidated_selected_memory_blocks_llm_before_any_call(self):

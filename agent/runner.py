@@ -7,6 +7,7 @@ from agent.models import (
 )
 from providers.base import LLMProvider
 from tools.registry import ToolRegistry
+from observability.model_trace import invoke_traced, prompt_identity
 from observability.tracer import Tracer
 
 
@@ -24,6 +25,8 @@ class AgentRunner:
         handoff_targets: dict[str, str] | None = None,
         max_iterations: int = 5,
         tracer: Tracer | None = None,
+        *,
+        prompt_version: int = 1,
     ):
         if not name.strip():
             raise ValueError("Agent name cannot be empty")
@@ -38,10 +41,13 @@ class AgentRunner:
             raise ValueError(
                 "max_iterations must be greater than 0"
             )
+        if type(prompt_version) is not int or prompt_version < 1:
+            raise ValueError("Prompt version must be a positive integer")
 
         self.name = name
         self.description = description
         self.instructions = instructions
+        self.prompt_version = prompt_version
         self.provider = provider
         self.registry = registry
         self.handoff_targets = dict(handoff_targets or {})
@@ -54,10 +60,9 @@ class AgentRunner:
 
         tools = self._tool_definitions()
 
-        response = self.provider.start(
+        response = self._call_provider("start",
             prompt=prompt,
             tools=tools,
-            instructions=self.instructions,
         )
 
         return self._run_from_response(
@@ -78,7 +83,7 @@ class AgentRunner:
         tools = self._tool_definitions()
 
         response = (
-            self.provider.continue_with_tool_results(
+            self._call_provider("continue_with_tool_results",
                 results=[
                     ToolResult(
                         call_id=request.call_id,
@@ -87,7 +92,6 @@ class AgentRunner:
                     )
                 ],
                 tools=tools,
-                instructions=self.instructions,
             )
         )
 
@@ -198,10 +202,9 @@ class AgentRunner:
                 results.append(result)
 
             response = (
-                self.provider.continue_with_tool_results(
+                self._call_provider("continue_with_tool_results",
                     results=results,
                     tools=tools,
-                    instructions=self.instructions,
                 )
             )
 
@@ -276,6 +279,16 @@ class AgentRunner:
                 event_type,
                 **data,
             )
+
+    @property
+    def prompt_identity(self) -> dict:
+        return prompt_identity(self.name, self.prompt_version, self.instructions)
+
+    def _call_provider(self, method, **arguments):
+        instructions = self.instructions
+        invoke = getattr(self.provider, method)
+        return invoke_traced(method, lambda: invoke(**arguments, instructions=instructions),
+                             prompt=prompt_identity(self.name, self.prompt_version, instructions), tracer=self.tracer)
     
     def propose(self, prompt: str) -> LLMResponse:
         """
@@ -285,10 +298,9 @@ class AgentRunner:
         if not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
-        return self.provider.start(
+        return self._call_provider("start",
             prompt=prompt,
             tools=self._tool_definitions(),
-            instructions=self.instructions,
         )
 
 
@@ -303,8 +315,7 @@ class AgentRunner:
         if not results:
             raise ValueError("Tool results cannot be empty")
 
-        return self.provider.continue_with_tool_results(
+        return self._call_provider("continue_with_tool_results",
             results=results,
             tools=self._tool_definitions(),
-            instructions=self.instructions,
         )

@@ -17,7 +17,7 @@ does **not** use `v84_bindings.json` or replace any V8.3 artifacts.
 - `execution/backends/base.py`: `submit`, `status`, `cancel`, `collect` API.
 - `execution/backends/fake.py`: deterministic in-memory test backend.
 - `execution/examples.py`: synthetic example job; contains no scientific data.
-- `scripts/demo_v841.py`: CLI for generation/validation/simulation only.
+- `scripts/tutorials/job_contract.py`: CLI for generation/validation/simulation only.
 - `tests/test_v841_backend.py`: independent offline tests.
 
 ## Why workload names rather than shell commands?
@@ -38,14 +38,14 @@ submission receipts.
 ```powershell
 python -m unittest discover -s tests -p "test_v841_backend.py" -v
 python -m unittest discover -s tests -v
-python -m scripts.demo_v841 validate --job examples/v841_job.json
-python -m scripts.demo_v841 simulate --job examples/v841_job.json
+python -m scripts.tutorials.job_contract validate --job examples/v841_job.json
+python -m scripts.tutorials.job_contract simulate --job examples/v841_job.json
 ```
 
 Optional: generate a brand-new copy of the example (refuses to overwrite):
 
 ```powershell
-python -m scripts.demo_v841 example --out my_test_job.json
+python -m scripts.tutorials.job_contract example --out my_test_job.json
 ```
 
 The `simulate` command prints `submitted -> running -> succeeded`, but does

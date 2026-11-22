@@ -89,7 +89,7 @@ Depuis la racine, prévisualiser le fichier public de tâches et vérifier les
 règles de l'outil, sans appel modèle :
 
 ```powershell
-python -m scripts.demo_v9_pilot preview
+python -m scripts.pilots.tool_retry preview
 python -m unittest tests.test_v9_retry_pilot tests.test_v9_retry_pilot_runner -v
 ```
 
@@ -101,9 +101,9 @@ reste consultable et le runner refuse de la rejouer sur le même journal.
 
 ```powershell
 $journal = "runs_control/v9_retry_pilot.sqlite3"
-python -m scripts.demo_v9_pilot approval --journal $journal --phase calibration
-python -m scripts.demo_v9_pilot execute --journal $journal --phase calibration --actor operateur --target-sha256 SHA_APPROBATION
-python -m scripts.demo_v9_pilot status --journal $journal
+python -m scripts.pilots.tool_retry approval --journal $journal --phase calibration
+python -m scripts.pilots.tool_retry execute --journal $journal --phase calibration --actor operateur --target-sha256 SHA_APPROBATION
+python -m scripts.pilots.tool_retry status --journal $journal
 ```
 
 Remplacer `SHA_APPROBATION` par celui affiché par `approval`. La commande
@@ -115,7 +115,7 @@ l'environnement ou le fichier `.env` local.
 ## Reconstituer la revue et le manuscrit hors ligne
 
 ```powershell
-python -m scripts.demo_v9_review --corpus examples/v9_retry_pilot.json --journal runs_control/v9_retry_pilot.sqlite3 --out-dir runs_control/v9_retry_manuscript --review-id v9-retry-pilot-001 --project v9-outil-relance
+python -m scripts.pilots.tool_retry_manuscript --corpus examples/v9_retry_pilot.json --journal runs_control/v9_retry_pilot.sqlite3 --out-dir runs_control/v9_retry_manuscript --review-id v9-retry-pilot-001 --project v9-outil-relance
 ```
 
 La commande ouvre le journal en lecture seule. Elle vérifie le corpus, le
@@ -137,7 +137,7 @@ et chaque ligne d'essai y conserve l'empreinte de ses événements. Les champs
 restent descriptifs. La bibliographie attend une revue des sources validée.
 
 Pour relire la version exacte, utiliser
-`python -m scripts.demo_v88 --store runs_control/v9_retry_manuscript/review.sqlite3 --review v9-retry-pilot-001 preview`.
+`python -m scripts.tutorials.scientific_manuscript --store runs_control/v9_retry_manuscript/review.sqlite3 --review v9-retry-pilot-001 preview`.
 Cette commande affiche aussi le SHA-256. Après la décision humaine, les
 commandes `decide` puis `export` du [guide V8.8](V8_8_SCIENTIFIC_PAPER_WRITER.md)
 permettent l'export approuvé dans un dossier distinct du brouillon.
