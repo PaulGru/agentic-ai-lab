@@ -39,11 +39,13 @@ Aucun Markdown.
 
 
 class ExperimentReviser:
-    def __init__(self, provider: LLMProvider):
+    def __init__(self, provider: LLMProvider, *, tracer=None):
         self.runner = AgentRunner(
             name="experiment_reviser",
             description="Propose une correction de code Python",
             instructions=REVISION_INSTRUCTIONS,
+            prompt_version=1,
+            tracer=tracer,
             provider=provider,
             registry=ToolRegistry(),
         )

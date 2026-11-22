@@ -29,7 +29,7 @@ La V8.5 ne lance ni LLM, ni Docker, ni job Slurm. Elle exploite une campagne V8.
 - Résultat : **statistiques descriptives seulement**. `inference = null`, `scientific_evidence = false`.
 
 ```
-python -m scripts.demo_v85 pilot --protocol examples/v846_protocol.json --jobs-db runs_control/v846_jobs.sqlite3
+python -m scripts.tutorials.paired_analysis pilot --protocol examples/v846_protocol.json --jobs-db runs_control/v846_jobs.sqlite3
 ```
 
 Si V8.4.6 n'a pas été exécutée et approuvée, terminer d'abord la campagne avant cette commande.
@@ -43,7 +43,7 @@ Si V8.4.6 n'a pas été exécutée et approuvée, terminer d'abord la campagne a
 - Les rapports affichent explicitement `scientific_evidence = false` et `ready_for_scientific_inference = false`, même si une valeur-p est disponible.
 
 ```
-python -m scripts.demo_v85 fixture --fixture examples/v85_paired_fixture.json
+python -m scripts.tutorials.paired_analysis fixture --fixture examples/v85_paired_fixture.json
 ```
 
 Pour les données fournies, résultat pédagogique attendu : moyenne des différences `1.9`, valeur-p exacte `0.00390625` (1024 inversions), intervalle bootstrap indicatif `[1.2, 2.6]`. **Ces chiffres ne documentent aucun modèle réel.**
@@ -53,8 +53,8 @@ Pour les données fournies, résultat pédagogique attendu : moyenne des différ
 Les deux modes supportent `--graph`. L'option utilise un `MemorySaver` **éphémère**, uniquement pour la démonstration ; on peut injecter un checkpointer durable compatible dans `AnalysisWorkflow.build(saver)` lors d'une intégration ultérieure.
 
 ```
-python -m scripts.demo_v85 fixture --fixture examples/v85_paired_fixture.json --graph
-python -m scripts.demo_v85 pilot --protocol examples/v846_protocol.json --jobs-db runs_control/v846_jobs.sqlite3 --graph
+python -m scripts.tutorials.paired_analysis fixture --fixture examples/v85_paired_fixture.json --graph
+python -m scripts.tutorials.paired_analysis pilot --protocol examples/v846_protocol.json --jobs-db runs_control/v846_jobs.sqlite3 --graph
 ```
 
 **Aucune approbation HITL supplémentaire** : ce graphe ne soumet pas de job. L'exécution sous V8.4.6 reste soumise à approbation humaine.
@@ -67,7 +67,7 @@ Par défaut dans `runs_control/v85_analysis/<dataset-id>/` :
 - `analysis_report.sha256` : empreinte du modèle canonique de rapport. **Checksum d'intégrité, pas signature cryptographique d'authenticité**.
 
 ```
-python -m scripts.demo_v85 inspect --out-dir runs_control/v85_analysis/v85-synthetic-paired-001
+python -m scripts.tutorials.paired_analysis inspect --out-dir runs_control/v85_analysis/v85-synthetic-paired-001
 ```
 
 `inspect` vérifie la cohérence d'un export existant ; pour revalider la provenance d'une campagne V8.4.6, il faut relancer `pilot` avec le journal SQLite.

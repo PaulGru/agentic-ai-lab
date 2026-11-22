@@ -18,8 +18,8 @@ cohérents des exemples ne prouvent aucune approbation humaine réelle.
 Depuis la racine du dépôt, dans l'environnement Python du projet :
 
 ```powershell
-python -m scripts.demo_v86 preview --input examples/v86_review_input.json
-python -m scripts.demo_v86 offline --input examples/v86_review_input.json --draft examples/v86_revision_draft.json
+python -m scripts.tutorials.scientific_critic preview --input examples/v86_review_input.json
+python -m scripts.tutorials.scientific_critic offline --input examples/v86_review_input.json --draft examples/v86_revision_draft.json
 ```
 
 La seconde commande demande `APPROVE` avant d'adopter la nouvelle version ;

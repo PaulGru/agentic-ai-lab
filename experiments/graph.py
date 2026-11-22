@@ -13,6 +13,7 @@ from experiments.agent import ExperimentAgent
 from experiments.proposal import ExperimentProposal
 from experiments.reviser import ExperimentReviser
 from experiments.sandbox import SandboxRunner, SandboxResult
+from observability.tracer import Tracer
 from providers.base import LLMProvider
 
 
@@ -24,6 +25,7 @@ class ExperimentState(TypedDict, total=False):
     initial_proposal: dict[str, Any]
     proposal: dict[str, Any]
     attempts: list[dict[str, Any]]
+    model_calls: list[dict[str, Any]]
     last_execution: dict[str, Any]
     approved: bool
     approval_sha256: str | None
@@ -45,6 +47,7 @@ class ExperimentWorkflow:
         self.sandbox = sandbox
 
     def propose_node(self, state: ExperimentState):
+        tracer = Tracer(print_events=False)
         # Une proposition fournie permet les démos déterministes.
         # Sinon, la proposition vient de notre Experiment Agent.
         if "initial_proposal" in state:
@@ -52,13 +55,15 @@ class ExperimentWorkflow:
                 state["initial_proposal"]
             )
         else:
-            agent = ExperimentAgent(self.provider_factory())
+            agent = ExperimentAgent(self.provider_factory(), tracer=tracer)
             proposal = agent.propose(state["question"])
 
+        calls = [event.data for event in tracer.events if event.type == "model_call"]
         if proposal.dependencies:
             return {
                 "proposal": proposal.model_dump(),
                 "attempts": [],
+                "model_calls": calls,
                 "status": "unsupported_dependencies",
                 "message": "V7.4 requires standard-library-only code",
             }
@@ -66,6 +71,7 @@ class ExperimentWorkflow:
         return {
             "proposal": proposal.model_dump(),
             "attempts": [],
+            "model_calls": calls,
             "approved": False,
             "approval_sha256": None,
             "status": "awaiting_approval",
@@ -199,20 +205,25 @@ class ExperimentWorkflow:
             **state["last_execution"]
         )
 
+        tracer = Tracer(print_events=False)
         try:
             revised = ExperimentReviser(
-                self.provider_factory()
+                self.provider_factory(), tracer=tracer
             ).revise(current, execution)
         except ValueError:
             return {
                 "status": "revision_failed",
                 "message": "LLM revision validation failed",
+                "model_calls": [*state.get("model_calls", []), *(event.data for event in tracer.events
+                                                                 if event.type == "model_call")],
             }
 
+        calls = [*state.get("model_calls", []), *(event.data for event in tracer.events if event.type == "model_call")]
         if revised.code == current.code:
             return {
                 "status": "unchanged",
                 "message": "No correction was proposed",
+                "model_calls": calls,
             }
 
         # Aucune ancienne approbation n'est réutilisée.
@@ -222,6 +233,7 @@ class ExperimentWorkflow:
             "approval_sha256": None,
             "status": "awaiting_approval",
             "message": "Corrected code requires new approval",
+            "model_calls": calls,
         }
 
     @staticmethod

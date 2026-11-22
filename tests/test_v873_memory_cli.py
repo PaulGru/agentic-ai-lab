@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class MemoryCLITests(unittest.TestCase):
     def run_cli(self, db, *args, input=""):
-        return subprocess.run([sys.executable, "-X", "utf8", "-m", "scripts.demo_v87_memory",
+        return subprocess.run([sys.executable, "-X", "utf8", "-m", "scripts.research_memory",
                                "--db", str(db), "--project", "demo-project", *args],
                               cwd=ROOT, capture_output=True, input=input, encoding="utf-8", timeout=60)
 
@@ -48,7 +48,7 @@ class MemoryCLITests(unittest.TestCase):
             path = root / "memory.db"
             self.assertEqual(self.run_cli(path, "init").returncode, 0)
             self.assertEqual(self.run_cli(path, "import-context", "--path", "examples/v86_design_context.json").returncode, 0)
-            result = subprocess.run([sys.executable, "-X", "utf8", "-m", "scripts.demo_v86", "--memory-db", str(path),
+            result = subprocess.run([sys.executable, "-X", "utf8", "-m", "scripts.tutorials.scientific_critic", "--memory-db", str(path),
                                      "--project", "demo-project", "--store", str(root / "reviews.db"), "offline",
                                      "--input", "examples/v86_review_input.json", "--out-dir", str(root / "export")],
                                     cwd=ROOT, capture_output=True, encoding="utf-8", timeout=90)

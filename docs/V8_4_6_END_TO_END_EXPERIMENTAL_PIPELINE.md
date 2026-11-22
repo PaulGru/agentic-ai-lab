@@ -55,7 +55,7 @@ sécurité et reproductibilité) sans changer le contrat d'exécution.
 - `pydantic`, `python-dotenv`, `langgraph`, `langgraph-checkpoint-postgres`,
   `psycopg` déjà présents dans l'environnement V8.4.5.
 - Docker Desktop opérationnel et image `agentic-lab-sandbox:v7.2` créée en V8.4.2.
-- PostgreSQL local via `compose.yaml` + `compose.v74.yaml` et `.env`
+- PostgreSQL local via `compose.yaml` + `compose.postgres-local.yaml` et `.env`
   contenant `POSTGRES_PASSWORD`.
 - Aucune clé OpenAI/Anthropic nécessaire et aucun accès HPC.
 
@@ -68,13 +68,13 @@ docker build -t agentic-lab-sandbox:v7.2 -f sandbox/Dockerfile sandbox
 Démarrer la base :
 
 ```powershell
-docker compose -f compose.yaml -f compose.v74.yaml up -d db
+docker compose -f compose.yaml -f compose.postgres-local.yaml up -d db
 ```
 
 ## 1. Prévisualiser les jobs (aucun Docker, aucune base)
 
 ```powershell
-python -m scripts.demo_v846 plan --protocol examples/v846_protocol.json
+python -m scripts.tutorials.synthetic_campaign plan --protocol examples/v846_protocol.json
 ```
 
 Deux jobs sont générés : `v846-pilot-001-baseline` et
@@ -83,11 +83,11 @@ Deux jobs sont générés : `v846-pilot-001-baseline` et
 ## 2. Préparer le workflow HITL (aucune soumission)
 
 ```powershell
-python -m scripts.demo_v846 start `
+python -m scripts.tutorials.synthetic_campaign start `
   --thread v846-pilot-thread-001 `
   --protocol examples/v846_protocol.json
 
-python -m scripts.demo_v846 status --thread v846-pilot-thread-001
+python -m scripts.tutorials.synthetic_campaign status --thread v846-pilot-thread-001
 ```
 
 Le graph s'interrompt sur `v846_campaign_approval`. **Aucun job Docker n'a
@@ -97,7 +97,7 @@ les deux jobs affichés.
 ## 3. Approuver et exécuter (Docker réel)
 
 ```powershell
-python -m scripts.demo_v846 resume `
+python -m scripts.tutorials.synthetic_campaign resume `
   --thread v846-pilot-thread-001 `
   --decision approve
 ```
@@ -113,8 +113,8 @@ Aucune soumission ne doit se produire.
 ## 4. Examiner les sorties
 
 ```powershell
-python -m scripts.demo_v846 status --thread v846-pilot-thread-001
-python -m scripts.demo_v846 report --thread v846-pilot-thread-001
+python -m scripts.tutorials.synthetic_campaign status --thread v846-pilot-thread-001
+python -m scripts.tutorials.synthetic_campaign report --thread v846-pilot-thread-001
 ```
 
 Le rapport se trouve sous `runs_control/v846_reports/v846-pilot-001.json`.

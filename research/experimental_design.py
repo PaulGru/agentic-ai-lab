@@ -26,13 +26,15 @@ class Factor(BaseModel):
 
     name: Identifier
     kind: Literal["model_scale", "architecture", "orchestration", "perturbation", "other"]
-    levels: list[Identifier] = Field(min_length=2, max_length=3)
+    levels: list[Identifier] = Field(min_length=2, max_length=4)
     operationalization: Detail
 
     @model_validator(mode="after")
     def unique_levels(self):
         if len(set(self.levels)) != len(self.levels):
             raise ValueError("Factor levels must be unique")
+        if len(self.levels) > 3 and self.kind != "perturbation":
+            raise ValueError("Only a perturbation factor can use four levels")
         if self.kind == "perturbation" and "clean" not in self.levels:
             raise ValueError("Perturbation factor must include clean control")
         return self

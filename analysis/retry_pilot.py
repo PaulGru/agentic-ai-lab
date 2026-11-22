@@ -59,19 +59,11 @@ class PairedComparison(StrictModel):
     gain_points: float
 
 
-class RetryPilotAnalysis(StrictModel):
-    schema_version: Literal["9.0"] = "9.0"
-    source_kind: Literal["verified_retry_pilot"] = SOURCE_KIND
-    pilot_id: str
-    question: str
+class PairedRetryAnalysis(StrictModel):
     model: str
-    plan_sha256: str = Field(pattern=HEX_SHA)
-    calibration_sha256: str = Field(pattern=HEX_SHA)
-    measurement_sha256: str = Field(pattern=HEX_SHA)
     task_count: int
     trial_count: int
     generation_count: int
-    generation_cost_estimate_usd: str
     procedure: list[str]
     trials: list[TrialResult]
     comparison: dict[Literal["clean", "transient"], PairedComparison]
@@ -81,6 +73,17 @@ class RetryPilotAnalysis(StrictModel):
 
     def fingerprint(self):
         return fingerprint(self.model_dump(mode="json"))
+
+
+class RetryPilotAnalysis(PairedRetryAnalysis):
+    schema_version: Literal["9.0"] = "9.0"
+    source_kind: Literal["verified_retry_pilot"] = SOURCE_KIND
+    pilot_id: str
+    question: str
+    plan_sha256: str = Field(pattern=HEX_SHA)
+    calibration_sha256: str = Field(pattern=HEX_SHA)
+    measurement_sha256: str = Field(pattern=HEX_SHA)
+    generation_cost_estimate_usd: str
 
 
 def _target(plan, phase, calibration_sha=None):
@@ -226,11 +229,7 @@ def verify_retry_calibration(corpus: PilotCorpus, journal: PilotJournal) -> str:
     return _verify_calibration(plan, calibration)
 
 
-def analyze_retry_pilot(corpus: PilotCorpus, journal: PilotJournal) -> RetryPilotAnalysis:
-    plan, calibration, measurement = _journal_phases(corpus, journal)
-    calibration_sha = _verify_calibration(plan, calibration)
-    results = _phase(plan, "measurement", measurement, [Trial.model_validate(row) for row in plan["schedule"]["trials"]],
-                     {task.task_id: (task, corpus.catalog[task.product]) for task in corpus.tasks}, calibration_sha)
+def paired_comparison(corpus: PilotCorpus, results: list[TrialResult]) -> dict[str, PairedComparison]:
     task_count = len(corpus.tasks)
     comparison = {}
     for profile in ("clean", "transient"):
@@ -247,10 +246,19 @@ def analyze_retry_pilot(corpus: PilotCorpus, journal: PilotJournal) -> RetryPilo
         comparison[profile] = PairedComparison(arms=arms, both_correct=paired[True, True], retry_only=paired[False, True],
                                                 no_retry_only=paired[True, False], neither_correct=paired[False, False],
                                                 gain_points=100.0 * (paired[False, True] - paired[True, False]) / task_count)
+    return comparison
+
+
+def analyze_retry_pilot(corpus: PilotCorpus, journal: PilotJournal) -> RetryPilotAnalysis:
+    plan, calibration, measurement = _journal_phases(corpus, journal)
+    calibration_sha = _verify_calibration(plan, calibration)
+    results = _phase(plan, "measurement", measurement, [Trial.model_validate(row) for row in plan["schedule"]["trials"]],
+                     {task.task_id: (task, corpus.catalog[task.product]) for task in corpus.tasks}, calibration_sha)
     cost = sum((standard_cost(row.input_tokens, row.output_tokens) for row in results), Decimal(0))
     return RetryPilotAnalysis(pilot_id=corpus.pilot_id, question=QUESTION, model=plan["model_profile"]["snapshot"],
                               plan_sha256=plan["plan_sha256"], calibration_sha256=calibration_sha,
-                              measurement_sha256=fingerprint(measurement), task_count=task_count, trial_count=len(results),
+                              measurement_sha256=fingerprint(measurement), task_count=len(corpus.tasks), trial_count=len(results),
                               generation_count=sum(row.generations for row in results),
-                              generation_cost_estimate_usd=str(cost), procedure=list(PROCEDURE), trials=results, comparison=comparison,
+                              generation_cost_estimate_usd=str(cost), procedure=list(PROCEDURE), trials=results,
+                              comparison=paired_comparison(corpus, results),
                               limitations=list(LIMITS))

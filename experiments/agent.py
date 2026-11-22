@@ -49,13 +49,15 @@ Le code doit être une chaîne JSON correctement échappée.
 
 
 class ExperimentAgent:
-    def __init__(self, provider: LLMProvider):
+    def __init__(self, provider: LLMProvider, *, tracer=None):
         self.runner = AgentRunner(
             name="experiment",
             description=(
                 "Conçoit des expériences Python reproductibles"
             ),
             instructions=EXPERIMENT_INSTRUCTIONS,
+            prompt_version=1,
+            tracer=tracer,
             provider=provider,
             registry=ToolRegistry(),
         )

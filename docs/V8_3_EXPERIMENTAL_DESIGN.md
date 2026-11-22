@@ -11,7 +11,7 @@ Le système réutilise `AgentRunner`, `ToolRegistry()` vide, `create_provider(na
 - `research/experimental_design.py` : types Pydantic et contrôles déterministes (facteurs, contrastes, baselines, références, estimations et limites, matrice).
 - `research/design_planner.py` : planificateur LLM multi-provider, sans appels d'outils ni exécution.
 - `research/design_graph.py` : `draft -> approval`, nouveau namespace de checkpoint.
-- `scripts/demo_v83.py` : commandes CLI `start`, `status`, `resume`, `export`.
+- `scripts/tutorials/experimental_design.py` : commandes CLI `start`, `status`, `resume`, `export`.
 - `tests/test_v83_design.py` : tests sans réseau/LLM réel, plus reprise HITL en mémoire.
 
 ## Prérequis
@@ -19,7 +19,7 @@ Le système réutilise `AgentRunner`, `ToolRegistry()` vide, `create_provider(na
 1. V8.1 approuvée : `missions/robustness-001/mission.json`.
 2. V8.2 approuvée : `missions/robustness-search-003/literature.json` (le chemin dépend du `--thread` utilisé pour **V8.2**).
 3. Environnement virtuel avec les dépendances déjà installées, `.env` avec `POSTGRES_PASSWORD`, le provider et son modèle configurés.
-4. PostgreSQL exposé localement : `docker compose -f compose.yaml -f compose.v74.yaml up -d db`.
+4. PostgreSQL exposé localement : `docker compose -f compose.yaml -f compose.postgres-local.yaml up -d db`.
 
 Le contenu des fichiers d'entrée et leurs SHA-256 doivent correspondre. La V8.2 doit comporter `status=approved` et le niveau de vérification des résumés attendu.
 
@@ -29,20 +29,20 @@ Le contenu des fichiers d'entrée et leurs SHA-256 doivent correspondre. La V8.2
 python -m unittest discover -s tests -p "test_v83_design.py" -v
 python -m unittest discover -s tests -v
 
-python -m scripts.demo_v83 start `
+python -m scripts.tutorials.experimental_design start `
   --thread robustness-design-001 `
   --mission missions/robustness-001/mission.json `
   --literature missions/robustness-search-003/literature.json
 
-python -m scripts.demo_v83 status --thread robustness-design-001
+python -m scripts.tutorials.experimental_design status --thread robustness-design-001
 
 # Après lecture de tout le protocole ; confirmation exacte OUI :
-python -m scripts.demo_v83 resume `
+python -m scripts.tutorials.experimental_design resume `
   --thread robustness-design-001 `
   --decision approve
 
 # Si besoin de réexporter le même contenu déjà approuvé :
-python -m scripts.demo_v83 export --thread robustness-design-001
+python -m scripts.tutorials.experimental_design export --thread robustness-design-001
 ```
 
 La commande `resume --decision reject` clôture le thread sans export. Pour proposer un **autre** protocole, démarrer un **nouveau thread**. Ne pas écraser les artefacts existants.

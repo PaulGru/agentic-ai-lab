@@ -84,8 +84,7 @@ La recherche native chez les fournisseurs peut entraîner des coûts.
 docker compose config --quiet
 docker compose up --build --wait -d api
 docker compose run --rm --entrypoint python lab -m unittest discover -s /app/tests -v
-docker compose exec -T api python /app/scripts/smoke_v54.py
-docker compose exec -T api python /app/scripts/smoke_v67.py
+docker compose exec -T api python -m unittest -v scripts.checks.api_http scripts.checks.research_http
 ```
 
 En CI, les tests n'appellent pas les véritables API OpenAI ou Anthropic.

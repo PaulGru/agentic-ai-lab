@@ -28,23 +28,23 @@ résultats de recherche; il teste l'orchestration technique.
 - `langgraph`, `langgraph-checkpoint-postgres`, `psycopg` dans l'environnement
   Python du projet (comme pour V7.4).
 - `.env` avec `POSTGRES_PASSWORD` pour le démonstrateur Windows.
-- PostgreSQL exposé sur `127.0.0.1:55432` via `compose.v74.yaml`.
+- PostgreSQL exposé sur `127.0.0.1:55432` via `compose.postgres-local.yaml`.
 
 ```powershell
-docker compose -f compose.yaml -f compose.v74.yaml up -d db
+docker compose -f compose.yaml -f compose.postgres-local.yaml up -d db
 python -m unittest discover -s tests -p "test_v845_workflow.py" -v
 ```
 
 ## Exemple recommandé : Slurm simulé, avec approbation réelle
 
 ```powershell
-python -m scripts.demo_v845 start --thread v845-demo-001 --job examples/v841_job.json
-python -m scripts.demo_v845 status --thread v845-demo-001
-python -m scripts.demo_v845 resume --thread v845-demo-001 --decision approve
-python -m scripts.demo_v845 status --thread v845-demo-001
-python -m scripts.demo_v845 advance --thread v845-demo-001
-python -m scripts.demo_v845 advance --thread v845-demo-001
-python -m scripts.demo_v845 status --thread v845-demo-001
+python -m scripts.tutorials.execution_approval start --thread v845-demo-001 --job examples/v841_job.json
+python -m scripts.tutorials.execution_approval status --thread v845-demo-001
+python -m scripts.tutorials.execution_approval resume --thread v845-demo-001 --decision approve
+python -m scripts.tutorials.execution_approval status --thread v845-demo-001
+python -m scripts.tutorials.execution_approval advance --thread v845-demo-001
+python -m scripts.tutorials.execution_approval advance --thread v845-demo-001
+python -m scripts.tutorials.execution_approval status --thread v845-demo-001
 ```
 
 La commande `resume` demande de saisir `APPROVE`. Pour tester le refus, utilise
@@ -61,15 +61,15 @@ une ancienne valeur après `advance`.
 Avec Docker Desktop et l'image de V8.4.2 :
 
 ```powershell
-python -m scripts.demo_v841 example --out examples/v845-local-job.json
+python -m scripts.tutorials.job_contract example --out examples/v845-local-job.json
 ```
 
 Change `job_id` dans le nouveau fichier avant exécution; puis :
 
 ```powershell
-python -m scripts.demo_v845 start --thread v845-local-001 --backend docker-local --job examples/v845-local-job.json
-python -m scripts.demo_v845 resume --thread v845-local-001 --backend docker-local --decision approve
-python -m scripts.demo_v845 status --thread v845-local-001 --backend docker-local
+python -m scripts.tutorials.execution_approval start --thread v845-local-001 --backend docker-local --job examples/v845-local-job.json
+python -m scripts.tutorials.execution_approval resume --thread v845-local-001 --backend docker-local --decision approve
+python -m scripts.tutorials.execution_approval status --thread v845-local-001 --backend docker-local
 ```
 
 La commande `resume` reste active jusqu'à la fin du job local afin de ne pas

@@ -1,0 +1,2 @@
+# Optional, for explicitly approved transfers of technical traces.
+weave==0.54.1

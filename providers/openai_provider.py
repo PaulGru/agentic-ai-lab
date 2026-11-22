@@ -12,6 +12,12 @@ from agent.models import (
 from providers.base import LLMProvider
 
 
+def reasoning_for(model: str) -> dict[str, str] | None:
+    if model == "gpt-6.2-astra":
+        return {"effort": "low"}
+    return None
+
+
 class OpenAIProvider(LLMProvider):
     def __init__(
         self,
@@ -52,28 +58,31 @@ class OpenAIProvider(LLMProvider):
 
         return result
 
+    def _request_options(
+        self,
+        tools: list[ToolDefinition] | None,
+        instructions: str | None,
+    ) -> dict:
+        request = {"model": self.model}
+        if self.max_output_tokens is not None:
+            request["max_output_tokens"] = self.max_output_tokens
+        if instructions:
+            request["instructions"] = instructions
+        reasoning = reasoning_for(self.model)
+        if reasoning is not None:
+            request["reasoning"] = reasoning
+        request_tools = self._request_tools(tools)
+        if request_tools:
+            request["tools"] = request_tools
+        return request
+
     def start(
         self,
         prompt: str,
         tools: list[ToolDefinition] | None = None,
         instructions: str | None = None,
     ) -> LLMResponse:
-        request = {
-            "model": self.model,
-            "input": prompt,
-        }
-        if self.max_output_tokens is not None:
-            request["max_output_tokens"] = self.max_output_tokens
-
-        if instructions:
-            request["instructions"] = instructions
-
-        request_tools = self._request_tools(tools)
-
-        if request_tools:
-            request["tools"] = request_tools
-
-        response = self.client.responses.create(**request)
+        response = self.client.responses.create(input=prompt, **self._request_options(tools, instructions))
 
         self._previous_response_id = response.id
 
@@ -90,30 +99,15 @@ class OpenAIProvider(LLMProvider):
                 "No previous response to continue"
             )
 
-        request = {
-            "model": self.model,
-            "previous_response_id": self._previous_response_id,
-            "input": [
-                {
-                    "type": "function_call_output",
-                    "call_id": result.call_id,
-                    "output": result.output,
-                }
-                for result in results
-            ],
-        }
-        if self.max_output_tokens is not None:
-            request["max_output_tokens"] = self.max_output_tokens
-
-        if instructions:
-            request["instructions"] = instructions
-
-        request_tools = self._request_tools(tools)
-
-        if request_tools:
-            request["tools"] = request_tools
-
-        response = self.client.responses.create(**request)
+        inputs = [
+            {"type": "function_call_output", "call_id": result.call_id, "output": result.output}
+            for result in results
+        ]
+        response = self.client.responses.create(
+            previous_response_id=self._previous_response_id,
+            input=inputs,
+            **self._request_options(tools, instructions),
+        )
 
         self._previous_response_id = response.id
 

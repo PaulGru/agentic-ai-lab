@@ -6,28 +6,42 @@ from pathlib import Path
 from typing import Any
 
 from analysis.ingest import ingest_verified_pilot
+from analysis.ood_replay import (
+    GPU_SOURCE_KIND, OODAnalysis, SOURCE_KIND as OOD_SOURCE_KIND, analyze_ood_gpu, analyze_ood_replay,
+)
 from analysis.pipeline import build_fixture_analysis, build_verified_pilot_analysis
+from analysis.agentic_gpu import SOURCE_KIND as AGENTIC_SOURCE_KIND, analyze_agentic
+from analysis.executable_protocol import ProtocolAnalysis, SOURCE_KIND as PROGRAM_SOURCE_KIND, analyze_protocol
+from analysis.retry_gpu import RetryGPUAnalysis, SOURCE_KIND as RETRY_GPU_SOURCE_KIND, analyze_retry_gpu
 from analysis.retry_pilot import RetryPilotAnalysis, SOURCE_KIND, analyze_retry_pilot
 from analysis.stat_contracts import AnalysisReport, PedagogicalPairedFixture
 from execution.campaign import PilotProtocol
 from execution.job_manager import DurableJobManager
+from execution.ood_gpu import OODGPUProtocol
+from execution.ood_replay import OODReplayProtocol
 from experiments.retry_pilot import PilotCorpus
 from experiments.retry_pilot_runner import PilotJournal
-from research.critique.contracts import Claim, DesignContext, EvidenceBundle, ReviewInput
+from research.critique.contracts import V9_SOURCE_KINDS, Claim, DesignContext, EvidenceBundle, ReviewInput
 from research.experimental_design import (
     ExperimentalDesign, validate_approved_literature, validate_design_against_inputs,
 )
 from research.literature import digest_json
+from research.ood_study import check_ood_study
+from research.retry_gpu_study import check_study as check_retry_gpu_study
 from research.retry_study import check_study
 
 
-def read_document(path: str | Path) -> dict[str, Any]:
-    """Bounded local JSON, including PowerShell UTF-8 BOM; no URL/UNC fetches."""
+def local_path(path: str | Path) -> Path:
+    """Accept an explicit local path, without URLs or UNC shares."""
     text_path = str(path)
     if text_path.startswith(("\\\\", "//")) or "://" in text_path:
         raise ValueError("Only explicit local file paths are supported")
-    source = Path(path)
-    with source.open("rb") as src:
+    return Path(path)
+
+
+def read_document(path: str | Path) -> dict[str, Any]:
+    """Read a bounded local JSON document, including a PowerShell UTF-8 BOM."""
+    with local_path(path).open("rb") as src:
         content = src.read(262_145)
     if len(content) > 262_144:
         raise ValueError("Input JSON exceeds 256 KiB")
@@ -87,7 +101,7 @@ def build_evidence(source_kind: str, source_document: dict, *,
                    manager: EvidenceLedger | None = None,
                    context: DesignContext | None = None,
                    claims: list[Claim] | None = None,
-                   expected_analysis: AnalysisReport | RetryPilotAnalysis | None = None) -> EvidenceBundle:
+                   expected_analysis: AnalysisReport | RetryPilotAnalysis | RetryGPUAnalysis | OODAnalysis | ProtocolAnalysis | None = None) -> EvidenceBundle:
     if context is not None:
         context = DesignContext.model_validate(context.model_dump(mode="json"))
         validate_context(context)
@@ -115,12 +129,39 @@ def build_evidence(source_kind: str, source_document: dict, *,
             corpus = PilotCorpus.model_validate(source_document)
             source = corpus.model_dump(mode="json")
         report = analyze_retry_pilot(corpus, manager)
+    elif source_kind == PROGRAM_SOURCE_KIND:
+        if not isinstance(manager, DurableJobManager) or not manager.read_only:
+            raise PermissionError("Protocol critique requires the original read-only job ledger")
+        source = source_document
+        report = analyze_protocol(source, manager)
+    elif source_kind == AGENTIC_SOURCE_KIND:
+        if not isinstance(manager, DurableJobManager) or not manager.read_only:
+            raise PermissionError("Agentic critique requires the original read-only GPU ledger")
+        source = source_document
+        report = analyze_agentic(source, manager)
+    elif source_kind == RETRY_GPU_SOURCE_KIND:
+        if not isinstance(manager, DurableJobManager) or not manager.read_only:
+            raise PermissionError("Catalog GPU critique requires the original read-only job ledger")
+        source = source_document
+        corpus, plan = check_retry_gpu_study(source)
+        report = analyze_retry_gpu(source["protocol"], corpus, plan, manager)
+    elif source_kind in {OOD_SOURCE_KIND, GPU_SOURCE_KIND}:
+        if not isinstance(manager, DurableJobManager) or not manager.read_only:
+            raise PermissionError("OOD critique requires the original read-only job ledger")
+        source = source_document
+        protocol = check_ood_study(source)
+        if source_kind == OOD_SOURCE_KIND and isinstance(protocol, OODReplayProtocol):
+            report = analyze_ood_replay(protocol, manager)
+        elif source_kind == GPU_SOURCE_KIND and isinstance(protocol, OODGPUProtocol):
+            report = analyze_ood_gpu(protocol, manager)
+        else:
+            raise ValueError("OOD evidence mode differs from the approved protocol")
     else:
         raise ValueError("Unsupported evidence source kind")
     if expected_analysis is not None and expected_analysis != report:
         raise ValueError("Analysis does not match recomputed source results")
     return EvidenceBundle(
-        schema_version="9.0" if source_kind == SOURCE_KIND else "8.6",
+        schema_version="9.0" if source_kind in V9_SOURCE_KINDS else "8.6",
         source_kind=source_kind, source_document=source, analysis=report,
         dataset_document=dataset, quality_document=quality, context=context,
         claims=claims or [], design_execution_link="unavailable" if context else "not_applicable")

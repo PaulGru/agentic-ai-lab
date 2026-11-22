@@ -74,7 +74,7 @@ remplace. Son code et ses anciennes consignes restent consultables à
 - `experiments/` : V7, sandbox et boucle de révision ; **ne pas autoriser l'exécution arbitraire**.
 - `execution/` : contrats, simulation, exécution locale isolée, gestionnaire durable, approbations et campagne pilote.
 - `analysis/` : vérification des artefacts, calculs statistiques et validation de leurs préconditions.
-- `tests/`, `examples/`, `scripts/`, `docs/` : tests et fixtures, exemples fictifs, démonstrations et explications.
+- `tests/`, `examples/`, `scripts/`, `docs/` : tests et fixtures, exemples fictifs, commandes et explications. L'[index des commandes](../scripts/README.md) indique les points d'entrée opérationnels et les tutoriels.
 - `runs_control/`, `runs_local/`, `missions/` : sorties locales exclues de Git ; préserver ces données lorsque l'on débogue.
 
 Le document plus ancien `docs/ARCHITECTURE.md` décrit surtout le socle **V6.7** ; le présent document complète l'architecture jusqu'à V8.5. Ne pas supposer que `README.md` décrit exhaustivement V8 (il présente encore principalement V7).

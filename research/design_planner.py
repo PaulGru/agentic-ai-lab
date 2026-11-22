@@ -73,12 +73,13 @@ class ExperimentalDesignPlanner:
             name="experimental_design_planner",
             description="Propose un protocole expérimental piloté et pré-enregistré",
             instructions=instructions,
+            prompt_version=1,
             provider=provider,
             registry=ToolRegistry(),
         )
 
     def propose(
-        self, mission: ResearchMission, review: LiteratureReview, *, feedback: str = ""
+        self, mission: ResearchMission, review: LiteratureReview, *, feedback: str = "", execution_constraints=None
     ) -> ExperimentalDesign:
         # Feed only evidence already cited in V8.2, not the 40 unexamined works.
         evidence = [x.model_dump() for x in review.findings]
@@ -92,6 +93,8 @@ class ExperimentalDesignPlanner:
         }}
         if feedback:
             payload["human_revision_request"] = feedback
+        if execution_constraints is not None:
+            payload["execution_constraints"] = execution_constraints
         if self.memory:
             payload, self.last_memory_context = self.memory.enrich(payload, "design_planner", mission.research_question)
         response = self.runner.propose(json.dumps(payload, ensure_ascii=False))

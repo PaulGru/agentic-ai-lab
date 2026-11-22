@@ -10,7 +10,7 @@ from unittest.mock import patch
 from execution.contracts import ExperimentJob
 from execution.backends.slurm_sim import SlurmSimBackend
 from execution.job_manager import DurableJobManager
-from scripts.demo_v844 import main
+from scripts.tutorials.durable_jobs import main
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "examples" / "v841_job.json"
@@ -27,7 +27,7 @@ class DemoV844ResumeTests(unittest.TestCase):
             backend.advance(handle)
             backend.advance(handle)
             DurableJobManager(backend, jobs_db).submit(job)  # V8.4.4 ledger sees submitted
-            argv = ["demo_v844", "advance", "--job", str(EXAMPLE),
+            argv = ["durable_jobs", "advance", "--job", str(EXAMPLE),
                     "--sim-db", sim_db, "--db", jobs_db]
             out = io.StringIO()
             with patch.object(sys, "argv", argv), contextlib.redirect_stdout(out):
@@ -43,7 +43,7 @@ class DemoV844ResumeTests(unittest.TestCase):
             backend = SlurmSimBackend(sim_db)
             manager = DurableJobManager(backend, jobs_db)
             manager.submit(job)
-            argv = ["demo_v844", "advance", "--job", str(EXAMPLE),
+            argv = ["durable_jobs", "advance", "--job", str(EXAMPLE),
                     "--sim-db", sim_db, "--db", jobs_db]
             for expected in ("running", "succeeded"):
                 out = io.StringIO()

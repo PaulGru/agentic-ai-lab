@@ -10,7 +10,7 @@ from experiments.graph import ExperimentWorkflow
 from experiments.sandbox import SandboxResult
 from tests.fakes import FakeProvider
 
-from scripts.demo_v74 import (
+from scripts.experiment_workflow import (
     demo_proposal,
     pending_approval,
 )

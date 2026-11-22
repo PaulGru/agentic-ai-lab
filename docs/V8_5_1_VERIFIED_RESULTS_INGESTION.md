@@ -47,7 +47,7 @@ cryptographique qui authentifie l'auteur de données.
   clé API, ni accès HPC pour cette étape de lecture et d'analyse.
 
 Si V8.4.6 n'a pas encore exécuté la campagne, lancer auparavant
-`python -m scripts.demo_v846 ...` selon la documentation précédente. **Ne pas
+`python -m scripts.tutorials.synthetic_campaign ...` selon la documentation précédente. **Ne pas
 rejouer un job existant sous le même identifiant.**
 
 ## Commandes PowerShell
@@ -55,11 +55,11 @@ rejouer un job existant sous le même identifiant.**
 ```powershell
 python -m unittest discover -s tests -p "test_v851_ingestion.py" -v
 
-python -m scripts.demo_v851 ingest `
+python -m scripts.tutorials.verified_results ingest `
     --protocol examples/v846_protocol.json `
     --jobs-db runs_control/v846_jobs.sqlite3
 
-python -m scripts.demo_v851 inspect `
+python -m scripts.tutorials.verified_results inspect `
     --out-dir runs_control/v851_analysis/v846-pilot-001
 ```
 

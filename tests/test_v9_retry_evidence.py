@@ -17,7 +17,7 @@ from research.manuscript import build_manuscript, export_manuscript, record_manu
 from research.memory.contracts import MemoryBinding
 from research.memory.integration import open_session
 from research.memory.sources import pointer
-from scripts.demo_v9_review import draft_pilot
+from research.pilot_manuscript import draft_pilot
 from tests.test_v9_retry_pilot_runner import ReplayClient
 
 

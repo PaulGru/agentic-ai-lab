@@ -13,7 +13,7 @@ existants. Elle ne modifie aucune mesure et n'accorde aucune permission d'exécu
 | `stores.py` | Offre PostgreSQL avec recherche plein texte native et SQLite/FTS5 pour le mode offline. Les documents sont immuables ; le cycle de vie est un journal d'événements. |
 | `service.py` | Impose le projet, revalide les sources, filtre les souvenirs actifs et borne le contexte. Enregistre ce qui a été réellement récupéré. |
 | `integration.py` | Fournit le même contexte aux agents OpenAI ou Anthropic. Les souvenirs sont présentés comme données historiques non fiables, avec leurs références. |
-| `demo_v87_memory.py` | Permet l'import, la recherche, l'inspection historique et les décisions humaines sur les notes et versions. |
+| `scripts/research_memory.py` | Permet l'import, la recherche, l'inspection historique et les décisions humaines sur les notes et versions. |
 
 Aucune dépendance n'est ajoutée. PostgreSQL et psycopg étaient déjà présents ;
 SQLite et FTS5 permettent les tests sans serveur ni clé API. Les backends ont le
@@ -125,11 +125,11 @@ conserve l'empreinte du contexte mémoire consulté lors de la revue.
 Depuis la racine du dépôt, dans l'environnement Python existant :
 
 ```powershell
-python -m scripts.demo_v87_memory --project demo init
-python -m scripts.demo_v87_memory --project demo import-context --path examples/v86_design_context.json
-python -m scripts.demo_v87_memory --project demo search --query "robustesse agents" --kind hypothesis
-python -m scripts.demo_v86 --memory-db runs_control/v87_memory.sqlite3 --project demo --store runs_control/v87_demo_reviews.sqlite3 offline --input examples/v86_review_input.json --out-dir runs_control/v87_demo_report
-python -m scripts.demo_v87_memory --project demo search --query "indépendance réplication" --kind lesson
+python -m scripts.research_memory --project demo init
+python -m scripts.research_memory --project demo import-context --path examples/v86_design_context.json
+python -m scripts.research_memory --project demo search --query "robustesse agents" --kind hypothesis
+python -m scripts.tutorials.scientific_critic --memory-db runs_control/v87_memory.sqlite3 --project demo --store runs_control/v87_demo_reviews.sqlite3 offline --input examples/v86_review_input.json --out-dir runs_control/v87_demo_report
+python -m scripts.research_memory --project demo search --query "indépendance réplication" --kind lesson
 ```
 
 Ces exemples sont entièrement fictifs. Pour une nouvelle revue, utiliser un
@@ -154,10 +154,10 @@ l'objet retourné par `note` ou peut être calculé depuis le contrat `MemoryIte
 Pour les anciens graphes :
 
 ```powershell
-python -m scripts.demo_v81 --memory-db runs_control/v87_memory.sqlite3 --project demo start --thread mission-memory-001 --brief tests/fixtures/research_brief.md
+python -m scripts.tutorials.research_mission --memory-db runs_control/v87_memory.sqlite3 --project demo start --thread mission-memory-001 --brief tests/fixtures/research_brief.md
 ```
 
-Les mêmes options existent dans `demo_v82` et `demo_v83`. Les utiliser aussi lors
+Les mêmes options existent dans `scripts.tutorials.literature_review` et `scripts.tutorials.experimental_design`. Les utiliser aussi lors
 de la reprise pour vérifier le même projet et la même base. Ces commandes
 conservent les coûts/API et validations humaines de leur workflow d'origine ;
 elles ne doivent pas être lancées comme des tests offline. Sans ces options,
@@ -171,9 +171,9 @@ Le schéma dédié par défaut est `research_memory_v87`, séparé des checkpoin
 Le DSN n'est jamais sérialisé dans un souvenir, une requête LLM ou un binding.
 
 ```powershell
-python -m scripts.demo_v87_memory --postgres --project demo init
-python -m scripts.demo_v87_memory --postgres --project demo import-context --path examples/v86_design_context.json
-python -m scripts.demo_v87_memory --postgres --project demo search --query "réplication"
+python -m scripts.research_memory --postgres --project demo init
+python -m scripts.research_memory --postgres --project demo import-context --path examples/v86_design_context.json
+python -m scripts.research_memory --postgres --project demo search --query "réplication"
 ```
 
 Les graphes acceptent `--memory-postgres --project demo`. Le critique conserve
@@ -201,7 +201,7 @@ Contrôle PostgreSQL séparé et explicite :
 
 ```powershell
 # RESEARCH_MEMORY_TEST_DATABASE_URL ou DATABASE_URL configurée sans l'imprimer
-python -m scripts.check_v87_memory
+python -m scripts.checks.memory_postgres
 ```
 
 Il crée un schéma `v87_test_<uuid>` isolé et préservé, puis vérifie recherche

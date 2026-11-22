@@ -20,7 +20,7 @@ modèles/algorithmes étudiés sont des workloads du moteur `execution/`.
   sorties bornées et protections héritées de V7.
 - `execution/backends/local.py`: implémente `ExecutionBackend` (`submit`,
   `status`, `cancel`, `collect`) et `wait` pour la CLI.
-- `scripts/demo_v842.py`: `check` sans effet, puis `run` avec confirmation
+- `scripts/tutorials/local_docker.py`: `check` sans effet, puis `run` avec confirmation
   humaine explicite.
 - `tests/test_v842_local.py`: tests offline, avec **transport simulé** ;
   ils ne prétendent pas valider Docker réellement.
@@ -49,7 +49,7 @@ message renvoyé par Docker. Elle crée également `receipt.json`.
 ```powershell
 python -m unittest discover -s tests -p "test_v842_local.py" -v
 python -m unittest discover -s tests -v
-python -m scripts.demo_v842 check --job examples/v841_job.json
+python -m scripts.tutorials.local_docker check --job examples/v841_job.json
 ```
 
 Vérifier que Docker Desktop est démarré, et construire l'image **déjà
@@ -63,7 +63,7 @@ docker image inspect agentic-lab-sandbox:v7.2
 Exécuter un vrai workload :
 
 ```powershell
-python -m scripts.demo_v842 run --job examples/v841_job.json
+python -m scripts.tutorials.local_docker run --job examples/v841_job.json
 ```
 
 Le programme montre le job et son SHA-256, puis demande de taper `EXECUTE`.

@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 from analysis.contracts import canonical_json, fingerprint
+from analysis.ood_replay import GPU_SOURCE_KIND
 from analysis.retry_pilot import SOURCE_KIND
+from analysis.retry_gpu import SOURCE_KIND as RETRY_GPU_SOURCE_KIND
+from analysis.agentic_gpu import SOURCE_KIND as AGENTIC_SOURCE_KIND
+from analysis.executable_protocol import SOURCE_KIND as PROGRAM_SOURCE_KIND
 from research.critique.contracts import DesignContext, RevisionProposal, ReviewInput, ReviewReport
 from research.critique.evidence import load_input, read_document, validate_context
 from research.critique.revision import verify_revision
@@ -147,24 +151,35 @@ def project_items(source: SourceSnapshot) -> list[MemoryItem]:
                 "/design_document/design/analysis_plan", "planning", tags=("design", "protocol", "analysis"))
     elif origin.kind == "review":
         source_kind = root["bundle"]["source_kind"]
-        if source_kind == SOURCE_KIND:
+        if source_kind in {SOURCE_KIND, RETRY_GPU_SOURCE_KIND}:
             scope = "controlled_pilot"
             for ref in root["report"]["observation_refs"]:
                 profile, _, policy = ref.split("/")[-3:]
                 path = "/bundle" + ref
                 counts = pointer(root, path)
+                label = "Pilote de relance GPU" if source_kind == RETRY_GPU_SOURCE_KIND else "Pilote de relance V9"
                 add("observation", f"observation:{origin.review_id}:{profile}:{policy}",
-                    f"Pilote de relance V9 — {profile} / {policy}", path, scope,
+                    f"{label} — {profile} / {policy}", path, scope,
                     tags=("relance", "exactitude", "outil", "pilote", profile, policy),
                     text=f"{counts['correct']}/{counts['total']} réponses exactes (profil {profile}, politique {policy}).")
+        elif source_kind in {PROGRAM_SOURCE_KIND, AGENTIC_SOURCE_KIND}:
+            scope = "controlled_pilot"
+            for ref in root["report"]["observation_refs"]:
+                contrast = pointer(root, "/bundle" + ref)
+                key = ref.rsplit("/", 1)[-1]
+                add("observation", f"observation:{origin.review_id}:{key}", f"Contraste du protocole {key}",
+                    "/bundle" + ref, scope, tags=("protocole", "contraste", "exactitude"),
+                    text=f"{contrast['gain_points']:+g} points sur {contrast['pairs']} paires.")
         else:
             scope = "pedagogical" if source_kind == "pedagogical_paired_fixture" else "engineering"
             for ref in root["report"]["observation_refs"]:
                 path = "/bundle" + ref
                 group = ref.rsplit("/", 1)[-1]
                 metric = root["bundle"]["source_document"].get("metric_name", "synthetic.mean")
-                add("observation", f"observation:{origin.review_id}:{group}", "Observation synthétique — " + group,
-                    path, scope, tags=("observation", "synthetic", group, metric))
+                label, tag = ("Calibration GPU", "calibration") if source_kind == GPU_SOURCE_KIND else (
+                    "Observation synthétique", "synthetic")
+                add("observation", f"observation:{origin.review_id}:{group}", f"{label} — {group}",
+                    path, scope, tags=("observation", tag, group, metric))
         for i, issue in enumerate(root["report"]["issues"]):
             verification = "source_checked" if issue["origin"] == "deterministic" else "unverified_model_opinion"
             add("lesson", f"issue:{origin.review_id}:{issue['issue_id']}", issue["issue_id"], f"/report/issues/{i}",

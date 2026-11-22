@@ -13,7 +13,7 @@ from research.critique.contracts import ReviewInput
 from research.critique.graph import ReviewWorkflow, config_for
 from research.critique.reporting import inspect_export
 from research.critique.store import ReviewStore
-from scripts.demo_v86 import verify_recorded_review
+from scripts.tutorials.scientific_critic import verify_recorded_review
 from tests.test_v851_ingestion import SimulatedTransport, sample_protocol
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class CLITests(unittest.TestCase):
     def run_cli(self, *args, input=""):
-        return subprocess.run([sys.executable, "-X", "utf8", "-m", "scripts.demo_v86", *args],
+        return subprocess.run([sys.executable, "-X", "utf8", "-m", "scripts.tutorials.scientific_critic", *args],
                               cwd=ROOT, capture_output=True, input=input, text=True, encoding="utf-8", timeout=90)
 
     def test_preview_never_creates_store(self):

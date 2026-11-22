@@ -24,8 +24,8 @@ validation exige une décision distincte et laisse les jobs du pilote intacts.
 Depuis la racine, sans serveur ni clé API :
 
 ```powershell
-python -m scripts.demo_v89 plan --input examples/v89_workflow.json
-python -m scripts.demo_v89 --root runs_control/v89_demo --run-id v89-demo offline --input examples/v89_workflow.json
+python -m scripts.tutorials.synthetic_research_workflow plan --input examples/v89_workflow.json
+python -m scripts.tutorials.synthetic_research_workflow --root runs_control/v89_demo --run-id v89-demo offline --input examples/v89_workflow.json
 ```
 
 Le parcours demande deux confirmations `APPROVE`, pour les jobs simulés puis
@@ -35,9 +35,9 @@ Utiliser le mode persistant pour déposer et relire une révision.
 Avec un PostgreSQL déjà autorisé et `V89_CHECKPOINT_DATABASE_URL` configurée :
 
 ```powershell
-python -m scripts.demo_v89 --root runs_control/v89_persistent --run-id v89-demo start --input examples/v89_workflow.json
-python -m scripts.demo_v89 --root runs_control/v89_persistent --run-id v89-demo status
-python -m scripts.demo_v89 --root runs_control/v89_persistent --run-id v89-demo resume --decision approve --target-sha256 <SHA> --actor operateur
+python -m scripts.tutorials.synthetic_research_workflow --root runs_control/v89_persistent --run-id v89-demo start --input examples/v89_workflow.json
+python -m scripts.tutorials.synthetic_research_workflow --root runs_control/v89_persistent --run-id v89-demo status
+python -m scripts.tutorials.synthetic_research_workflow --root runs_control/v89_persistent --run-id v89-demo resume --decision approve --target-sha256 <SHA> --actor operateur
 ```
 
 Consulter le statut après chaque reprise et recopier l'empreinte affichée.

@@ -2,6 +2,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -10,11 +11,12 @@ from analysis.contracts import fingerprint
 from execution.campaign import run_campaign
 from execution.contracts import ExperimentJob
 from experiments.retry_pilot import PilotCorpus
-from experiments.retry_pilot_runner import run_phase
+from experiments.retry_pilot_runner import MODEL as PILOT_MODEL, run_phase
 from providers.replay_provider import FakeProvider
 from research.brief_workflow import BriefWorkflow, Decision, Revision
 from research.critique.contracts import LLMSettings
 from research.critique.evidence import read_document
+from research.critique.llm import bounded_provider
 from research.literature_search import OpenAlexClient
 from scripts.research_workflow import guide
 from tests.test_v82_literature import FakeOpenAlex, WORKS, mission_data, valid_review
@@ -149,6 +151,40 @@ class BriefWorkflowTests(unittest.TestCase):
         self.assertIn("exécuteur", blocked["attention"])
         self.assertEqual(len(self.remote.calls), 0)
         self.assertEqual(self.rewind("protocol", workload="retry_catalog")["stage"], "review_protocol")
+
+    def test_astra_plans_and_synthesizes_with_separate_experiment_configuration(self):
+        self.flow.provider_factory = bounded_provider
+        settings = LLMSettings(provider="openai", model="gpt-6.2-astra")
+        with patch("providers.openai_provider.OpenAI") as openai:
+            client = openai.return_value
+            client.responses.create.side_effect = [
+                SimpleNamespace(id="mission-test", output=[], output_text=json.dumps(mission_data())),
+                SimpleNamespace(id="literature-test", output=[], output_text=json.dumps(valid_review())),
+                SimpleNamespace(id="protocol-test", output=[], output_text=json.dumps(valid_design())),
+            ]
+            starting = self.flow.start("test-study", BRIEF, settings, "unmapped")
+            self.assertEqual(starting["pending"]["details"]["reasoning"], {"effort": "low"})
+            openai.assert_not_called()
+            self.approve("mission")
+            self.approve("review_mission")
+            self.approve("catalog")
+            self.approve("literature")
+            self.approve("review_literature")
+            self.approve("protocol")
+            for invocation in client.responses.create.call_args_list:
+                self.assertEqual(invocation.kwargs["model"], settings.model)
+                self.assertEqual(invocation.kwargs["reasoning"], {"effort": "low"})
+                self.assertEqual(invocation.kwargs["max_output_tokens"], settings.max_output_tokens)
+                self.assertNotIn("tools", invocation.kwargs)
+            self.assertEqual(client.responses.create.call_count, 3)
+            self.assertEqual(self.approve("review_protocol")["block"]["reason"], "no_compatible_executor")
+            self.rewind("protocol", workload="retry_catalog")
+            self.approve("review_protocol")
+            self.assertEqual(self.remote.calls, [])
+            self.approve("calibration")
+            self.assertEqual(client.responses.create.call_count, 3)
+            self.assertEqual(len(self.remote.calls), 8)
+            self.assertEqual({request["model"] for request in self.remote.calls}, {PILOT_MODEL})
 
     def test_brief_declares_synthetic_workload_and_exports_only_verified_receipts(self):
         self.flow.start("test-study", BRIEF + "\n## Exécuteur\nsynthetic.mean\n",

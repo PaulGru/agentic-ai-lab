@@ -3,9 +3,15 @@ from __future__ import annotations
 
 import math
 
-from analysis.retry_pilot import RetryPilotAnalysis
+from analysis.ood_replay import OODAnalysis, OODGPUAnalysis
+from analysis.agentic_gpu import AgenticAnalysis
+from analysis.executable_protocol import ProtocolAnalysis
+from analysis.retry_gpu import RetryGPUAnalysis
+from analysis.retry_pilot import PairedRetryAnalysis
 from research.critique.contracts import (
-    ClaimAssessment, CriticSuggestions, CritiqueIssue, EvidenceBundle, PILOT_CONCLUSION, ReviewReport,
+    AGENTIC_CONCLUSION, CPU_CONCLUSION, ClaimAssessment, CriticSuggestions, CritiqueIssue, EvidenceBundle,
+    GPU_CONCLUSION, OOD_CONCLUSION,
+    PILOT_CONCLUSION, ReviewReport,
 )
 from research.critique.evidence import EvidenceLedger, resolve_ref, verify_evidence
 
@@ -20,8 +26,13 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
             evidence_refs=refs, requires_human_review=human))
 
     observation_refs = []
-    retry_pilot = isinstance(bundle.analysis, RetryPilotAnalysis)
+    retry_pilot = isinstance(bundle.analysis, PairedRetryAnalysis)
+    retry_gpu = isinstance(bundle.analysis, RetryGPUAnalysis)
+    ood_pilot = isinstance(bundle.analysis, OODAnalysis)
+    cpu_pilot = isinstance(bundle.analysis, ProtocolAnalysis)
+    conclusion = {}
     if retry_pilot:
+        conclusion["conclusion"] = PILOT_CONCLUSION
         for index, code in enumerate(("pilot_sample", "fault_profile", "descriptive_scope")):
             recommendations = (
                 "Élargir le corpus et répéter les essais sur plusieurs versions de modèles.",
@@ -33,11 +44,32 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
         for profile in ("clean", "transient"):
             for policy in ("no_retry", "retry_once"):
                 observation_refs.append(f"/analysis/comparison/{profile}/arms/{policy}")
-        if bundle.source_document.get("kind") == "brief_retry_study":
-            issue("workflow_abstract_only", "bibliography", "minor",
-                  "La revue approuvée s'appuie sur les résumés et métadonnées du catalogue.",
-                  "Vérifier les textes intégraux avant une revendication de nouveauté.",
-                  ["/source_document/literature/verification_level"], True)
+    elif ood_pilot:
+        if isinstance(bundle.analysis, OODGPUAnalysis):
+            conclusion["conclusion"] = GPU_CONCLUSION
+            issue("ood_gpu_scope", "methodology", "major",
+                  "La calibration évalue une révision de Qwen sur deux tâches et leurs reformulations.",
+                  "Définir un jeu de tâches indépendant et un plan d'analyse avant toute campagne OOD.",
+                  ["/analysis/trials", "/analysis/model_revision", "/analysis/runtime"], True)
+            if not bundle.analysis.reference_calibration_passed:
+                issue("ood_gpu_reference_failed", "methodology", "major",
+                      "Le modèle a échoué sur au moins une des deux entrées de référence.",
+                      "Examiner le format des réponses et les entrées avant de préparer une mesure.",
+                      ["/analysis/reference_calibration_passed", "/analysis/arms/qwen3-4b-reference"], True)
+        else:
+            conclusion["conclusion"] = OOD_CONCLUSION
+            issue("ood_replay_scope", "methodology", "major",
+                  "Les réponses sont fictives et les écarts ont été construits dans la fixture.",
+                  "Utiliser ces écarts pour valider le calcul. Mesurer ensuite des réponses de modèles réels.",
+                  ["/analysis/simulated", "/analysis/degradation_points"], True)
+        observation_refs = [f"/analysis/arms/{arm}" for arm in sorted(bundle.analysis.arms)]
+    elif cpu_pilot:
+        conclusion["conclusion"] = AGENTIC_CONCLUSION if isinstance(bundle.analysis, AgenticAnalysis) else CPU_CONCLUSION
+        for index, limitation in enumerate(bundle.analysis.limitations):
+            issue(f"cpu_scope_{index}", "methodology", "major", limitation,
+                  "Fixer de nouvelles tâches et un plan d'inférence avant d'élargir la conclusion.",
+                  [f"/analysis/limitations/{index}"], True)
+        observation_refs = [f"/analysis/contrasts/{key}" for key in bundle.analysis.contrasts]
     else:
         issue("engineering_scope", "scope", "major",
               "Les sources actuelles sont synthétiques ; elles ne justifient aucune conclusion scientifique.",
@@ -46,6 +78,11 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
         for group in sorted(bundle.analysis.descriptive.groups):
             safe_group = group.replace("~", "~0").replace("/", "~1")
             observation_refs.append(f"/analysis/descriptive/groups/{safe_group}")
+    if ood_pilot or retry_gpu or cpu_pilot or bundle.source_document.get("kind") == "brief_retry_study":
+        issue("workflow_abstract_only", "bibliography", "minor",
+              "La revue approuvée s'appuie sur les résumés et métadonnées du catalogue.",
+              "Vérifier les textes intégraux avant une revendication de nouveauté.",
+              ["/source_document/literature/verification_level"], True)
     if bundle.source_kind == "verified_pilot_aggregates":
         issue("no_replication", "statistics", "major",
               "Chaque job fournit un agrégat ; le nombre de valeurs entrées ne mesure pas la réplication indépendante.",
@@ -60,7 +97,7 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
               "Le contrat du pilote ne conserve pas un digest immuable de l'image Docker exécutée.",
               "Documenter cette limite de reproductibilité ; vérifier l'environnement avant une campagne réelle.",
               ["/source_document/schema_version"], True)
-    elif not retry_pilot:
+    elif not (retry_pilot or ood_pilot or cpu_pilot):
         issue("assumed_independence", "methodology", "major",
               "L'indépendance et la symétrie des différences ne sont pas démontrées par une fixture JSON.",
               "Justifier ces hypothèses sur un futur processus de collecte ; conserver ici le statut pédagogique.",
@@ -71,6 +108,9 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
                   "Examiner les blocages sans traiter le seuil pédagogique comme une analyse de puissance.",
                   ["/analysis/validity/blockers"])
     hypothesis_refs = []
+    if ood_pilot or retry_gpu or cpu_pilot:
+        hypotheses = bundle.source_document["mission"]["mission"]["hypotheses"]
+        hypothesis_refs = [f"/source_document/mission/mission/hypotheses/{i}" for i in range(len(hypotheses))]
     if bundle.context:
         issue("unlinked_design", "provenance", "major",
               "Aucun lien vérifié ne rattache ces résultats au design V8.3 fourni.",
@@ -93,7 +133,7 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
             status, reason = "hypothesis_only", "Une hypothèse reste à tester ; elle n'est pas un résultat."
         elif claim.kind == "scientific_conclusion":
             status = "outside_scientific_scope"
-            reason = ("Ce pilote contrôlé ne permet pas cette conclusion scientifique." if retry_pilot else
+            reason = ("Ce pilote contrôlé ne permet pas cette conclusion scientifique." if retry_pilot or ood_pilot or cpu_pilot else
                       "Les sources V8.5 actuelles interdisent les conclusions scientifiques.")
         elif claim.claimed_value is not None and len(claim.evidence_refs) == 1:
             try:
@@ -103,6 +143,10 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
                                                             "/dataset_document/observations/", "/source_document/pairs/"))
                 if retry_pilot:
                     allowed = claim.evidence_refs[0].startswith("/analysis/comparison/")
+                elif ood_pilot:
+                    allowed = claim.evidence_refs[0].startswith(("/analysis/arms/", "/analysis/degradation_points/"))
+                elif cpu_pilot:
+                    allowed = claim.evidence_refs[0].startswith(("/analysis/cells/", "/analysis/contrasts/", "/analysis/shift_gaps/"))
                 if (allowed and type(actual) in (int, float) and math.isfinite(actual)
                         and actual == claim.claimed_value):
                     status, reason = "supported_numeric", "Valeur numérique concordante ; l'interprétation du texte reste à relire."
@@ -117,7 +161,7 @@ def _review(bundle: EvidenceBundle) -> ReviewReport:
         bundle_sha256=bundle.fingerprint(), analysis_sha256=bundle.analysis.fingerprint(),
         observation_refs=observation_refs, hypothesis_refs=hypothesis_refs,
         issues=issues, claim_assessments=assessments,
-        **({"conclusion": PILOT_CONCLUSION} if retry_pilot else {}))
+        **conclusion)
 
 
 def deterministic_review(bundle: EvidenceBundle, manager: EvidenceLedger | None = None) -> ReviewReport:

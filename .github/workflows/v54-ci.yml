@@ -38,27 +38,22 @@ jobs:
       - name: Run HTTP integration tests
         run: |
           docker compose exec -T api \
-            python /app/scripts/smoke_v54.py
-      
-      - name: Run research HTTP contract tests
-        run: |
-          docker compose exec -T api \
-            python /app/scripts/smoke_v67.py
+            python -m unittest -v scripts.checks.api_http scripts.checks.research_http
 
-      - name: Verify V8.6 PostgreSQL restart across processes
+      - name: Verify critic restart with PostgreSQL
         run: |
           docker compose exec -T api \
-            python -m scripts.check_v86_postgres
+            python -m scripts.checks.critic_postgres
 
-      - name: Verify V8.7 PostgreSQL research memory across sessions
+      - name: Verify research memory across PostgreSQL sessions
         run: |
           docker compose exec -T api \
-            python -m scripts.check_v87_memory
+            python -m scripts.checks.memory_postgres
 
-      - name: Verify V8.9 PostgreSQL workflow across CLI processes
+      - name: Verify the synthetic research workflow across CLI processes
         run: |
           docker compose exec -T api \
-            python -m scripts.check_v89_postgres
+            python -m scripts.checks.synthetic_workflow_postgres
 
       - name: Show logs on failure
         if: failure()

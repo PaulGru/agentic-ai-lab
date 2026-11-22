@@ -24,10 +24,10 @@ empreinte est conservée. Un appel éditorial demande aussi sa revalidation.
 Depuis la racine du dépôt, avec une revue V8.6 déjà enregistrée :
 
 ```powershell
-python -m scripts.demo_v88 --store runs_control/v86_reviews.sqlite3 --review v86-demo-001 preview
-python -m scripts.demo_v88 --store runs_control/v86_reviews.sqlite3 --review v86-demo-001 decide --decision approve --actor relecteur --target-sha256 <SHA>
-python -m scripts.demo_v88 --store runs_control/v86_reviews.sqlite3 --review v86-demo-001 export --target-sha256 <SHA> --out-dir runs_control/paper-demo
-python -m scripts.demo_v88 --store runs_control/v86_reviews.sqlite3 --review v86-demo-001 verify --target-sha256 <SHA> --out-dir runs_control/paper-demo
+python -m scripts.tutorials.scientific_manuscript --store runs_control/v86_reviews.sqlite3 --review v86-demo-001 preview
+python -m scripts.tutorials.scientific_manuscript --store runs_control/v86_reviews.sqlite3 --review v86-demo-001 decide --decision approve --actor relecteur --target-sha256 <SHA>
+python -m scripts.tutorials.scientific_manuscript --store runs_control/v86_reviews.sqlite3 --review v86-demo-001 export --target-sha256 <SHA> --out-dir runs_control/paper-demo
+python -m scripts.tutorials.scientific_manuscript --store runs_control/v86_reviews.sqlite3 --review v86-demo-001 verify --target-sha256 <SHA> --out-dir runs_control/paper-demo
 ```
 
 Remplacer `<SHA>` par l'empreinte affichée par `preview`. `decide` demande une

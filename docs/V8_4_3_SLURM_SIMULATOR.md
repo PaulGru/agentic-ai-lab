@@ -11,7 +11,7 @@ cluster Slurm** : c'est un contrat de soumission + un simulateur persistant.
 ## Fichiers
 
 - `execution/backends/slurm_sim.py` : adaptation des états Slurm, aperçu du script `sbatch`, simulation.
-- `scripts/demo_v843.py` : affichage du script et cycle de vie fictif.
+- `scripts/tutorials/slurm_simulator.py` : affichage du script et cycle de vie fictif.
 - `tests/test_v843_slurm_sim.py` : tests sans réseau.
 
 ## Commandes
@@ -20,8 +20,8 @@ Depuis la racine du dépôt (PowerShell) :
 
 ```powershell
 python -m unittest discover -s tests -p "test_v843_slurm_sim.py" -v
-python -m scripts.demo_v843 preview --job examples/v841_job.json
-python -m scripts.demo_v843 simulate --job examples/v841_job.json
+python -m scripts.tutorials.slurm_simulator preview --job examples/v841_job.json
+python -m scripts.tutorials.slurm_simulator simulate --job examples/v841_job.json
 ```
 
 Le script preview ne contient que le workload autorisé `synthetic.mean`,
